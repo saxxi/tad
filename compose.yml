@@ -1,0 +1,28 @@
+# tado local — http://127.0.0.1:8787 on this Mac; for remote access put an authenticating
+# reverse proxy in front (see README). Starts with Docker Desktop (restart policy).
+#   docker compose up -d --build
+services:
+  tado:
+    build: .
+    restart: unless-stopped
+    user: "502:20" # uid:gid of the host user, so data/ files stay owned by them
+    ports:
+      - "127.0.0.1:8787:8787" # loopback only; remote access only through an authenticating proxy
+    volumes:
+      - ./data:/app/data
+    environment:
+      TZ: Europe/Rome
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8787/api/status', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tado° local</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a2129; --panel2: #232c36; --text: #e8eef4;
+    --muted: #8fa1b3; --accent: #ff7a45; --ok: #35c46d; --bad: #e5534b;
+    --chip: #2b3644;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+           padding: 16px 22px; border-bottom: 1px solid #26313d; }
+  header h1 { font-size: 18px; margin: 0 auto 0 0; font-weight: 650; }
+  header h1 span { color: var(--accent); }
+  .chip { background: var(--chip); border-radius: 999px; padding: 4px 12px;
+          font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  .chip b { color: var(--text); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+  main { padding: 22px; max-width: 1100px; margin: 0 auto; }
+  .card { background: var(--panel); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+  .hidden { display: none !important; }
+  button { cursor: pointer; border: 0; border-radius: 9px; padding: 8px 14px;
+           background: var(--panel2); color: var(--text); font-size: 13.5px; font-weight: 600; }
+  button:hover { filter: brightness(1.15); }
+  button.primary { background: var(--accent); color: #1b100a; }
+  button.ghost { background: transparent; border: 1px solid #37455a; color: var(--muted); }
+  button.active { outline: 2px solid var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .setup h2 { margin: 0 0 8px; font-size: 16px; }
+  .setup ol { color: var(--muted); padding-left: 20px; margin: 10px 0 14px; }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size: 26px; letter-spacing: 4px;
+          background: var(--panel2); border-radius: 10px; padding: 10px 18px; display: inline-block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .zone { background: var(--panel); border-radius: 14px; padding: 18px 20px; position: relative; }
+  .zone h3 { margin: 0; font-size: 15.5px; font-weight: 650; }
+  .zone .type { color: var(--muted); font-size: 12px; text-transform: lowercase; }
+  .temp-row { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 4px; }
+  .cur { font-size: 42px; font-weight: 700; letter-spacing: -1px; }
+  .cur small { font-size: 20px; color: var(--muted); font-weight: 500; }
+  .meta { color: var(--muted); font-size: 12.5px; display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+  .heatbadge { color: var(--accent); font-weight: 700; font-size: 12.5px; }
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .stepper { display: flex; align-items: center; gap: 10px; background: var(--panel2);
+             border-radius: 10px; padding: 4px 8px; }
+  .stepper button { width: 34px; height: 34px; padding: 0; font-size: 18px; border-radius: 8px; }
+  .stepper .target { min-width: 52px; text-align: center; font-size: 17px; font-weight: 650; }
+  .pill { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 10px; background: var(--chip); color: var(--ok); }
+  .zone.is-heating .pill { background: #3a2417; color: var(--accent); }
+  .zone.is-heating { box-shadow: inset 3px 0 0 var(--accent); }
+  .zone.is-off .pill { color: var(--muted); }
+  .zone.is-off .cur { color: var(--muted); }
+  .devices { margin-top: 12px; border-top: 1px solid #26313d; padding-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .devices div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .temp-row { flex-wrap: wrap; }
+  .devices div { align-items: center; }
+  .devices button.blink { padding: 3px 9px; font-size: 12px; }
+  .ok-txt { color: var(--ok); } .bad-txt { color: var(--bad); font-weight: 700; }
+  .override { margin-top: 10px; font-size: 12.5px; color: var(--muted); background: var(--panel2);
+              border-radius: 8px; padding: 6px 10px; display: inline-block; }
+  .override b { color: var(--accent); }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+           background: var(--panel2); border: 1px solid #37455a; padding: 10px 18px;
+           border-radius: 10px; font-size: 13.5px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #toast.err { border-color: var(--bad); color: #ffb3ae; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--muted); font-size: 13px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>tado<span>°</span> local</h1>
+  <span class="chip" id="chip-bridge"><span class="dot" id="dot-bridge"></span>bridge <b id="bridge-txt">…</b></span>
+  <span class="chip" id="chip-auth"><span class="dot" id="dot-auth"></span><b id="auth-txt">…</b></span>
+  <span class="chip hidden" id="chip-home"><b id="home-txt"></b></span>
+  <button class="ghost hidden" id="btn-signout" title="forget the login in this browser">Sign out</button>
+  <span class="chip hidden" id="chip-presence">presence
+    <button class="ghost" style="padding:2px 10px" id="btn-home">Home</button>
+    <button class="ghost" style="padding:2px 10px" id="btn-away">Away</button>
+  </span>
+</header>
+<main>
+  <div class="card setup hidden" id="setup">
+    <h2>Connect your tado° account</h2>
+    <div id="setup-start">
+      <p class="muted">One-time login. Temperatures and on/off work locally without it; the tado account adds
+        room names, "Schedule" (resume) and Home/Away.</p>
+      <button class="primary" id="btn-connect">Connect tado account</button>
+    </div>
+    <div id="setup-wait" class="hidden">
+      <ol>
+        <li>Open <a id="verify-link" href="#" target="_blank" rel="noopener">this tado login page</a> and confirm the code below.</li>
+        <li>Come back here — this page detects the login automatically.</li>
+      </ol>
+      <div class="code" id="user-code"></div>
+      <p class="muted" id="setup-countdown"></p>
+    </div>
+  </div>
+
+  <div class="card hidden" id="bridge-card">
+    <h2 style="margin:0 0 6px;font-size:16px">Bridge not reachable</h2>
+    <p class="muted" id="bridge-error"></p>
+    <div class="row">
+      <button class="primary" id="btn-rescan">Scan network again</button>
+      <span class="muted" id="rescan-result"></span>
+    </div>
+  </div>
+
+  <div class="card hidden" id="pair-card">
+    <h2 style="margin:0 0 6px;font-size:16px">Pair with the bridge over HomeKit (local only)</h2>
+    <p class="muted">Enter the 8-digit HomeKit code from the sticker on the Internet Bridge (format 123-45-678).
+      The bridge can have only one HomeKit owner, so it must not be in Apple Home.</p>
+    <div class="row">
+      <input id="pin" inputmode="numeric" autocomplete="off" placeholder="123-45-678"
+             style="font:600 17px ui-monospace,Menlo,monospace;letter-spacing:2px;background:var(--panel2);color:var(--text);border:1px solid #37455a;border-radius:9px;padding:8px 12px;width:170px">
+      <button class="primary" id="btn-pair">Pair</button>
+      <span class="muted" id="pair-result"></span>
+    </div>
+  </div>
+
+  <div class="row" style="margin:0 0 12px;justify-content:space-between">
+    <p class="muted hidden" id="summary" style="margin:0"></p>
+    <span class="row"><span class="muted" id="health-txt"></span><button class="ghost" id="btn-health">Check devices</button></span>
+  </div>
+  <div class="grid" id="zones"></div>
+  <p class="muted hidden" id="empty">No zones yet — waiting for the bridge…</p>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let status = null;
+let activateTimer = null;
+let refreshTimer = null;
+
+// Behind an authenticating proxy (basic auth) the browser caches the login. Signing out =
+// overwrite that cache with credentials the proxy rejects; the next visit asks again.
+if (!["127.0.0.1", "localhost"].includes(location.hostname)) $("btn-signout").classList.remove("hidden");
+$("btn-signout").onclick = () => {
+  clearInterval(refreshTimer);
+  const xhr = new XMLHttpRequest();
+  xhr.open("GET", "api/status", true, "signed-out", "x");  // XHR credentials replace the cached ones
+  xhr.onloadend = () => {
+    document.body.innerHTML = '<main><div class="card"><h2 style="margin:0 0 8px;font-size:16px">Signed out</h2>' +
+      '<p class="muted">Close this tab, or <a href="./">sign in again</a>.</p></div></main>';
+  };
+  xhr.send();
+};
+
+function toast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "show" + (isErr ? " err" : "");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.className = "", 3200);
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts ? {
+    method: opts.method || "POST",
+    headers: {"Content-Type": "application/json"},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  } : undefined);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || ("HTTP " + r.status));
+  return data;
+}
+
+function fmtTemp(v) {
+  if (v == null) return "—";
+  return (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, "");
+}
+
+// ---- header / setup rendering ------------------------------------------------
+function renderStatus(s) {
+  status = s;
+  const b = s.bridge || {};
+  $("dot-bridge").className = "dot" + (b.ok ? " ok" : b.ip ? " bad" : "");
+  $("bridge-txt").textContent = b.ip ? b.ip + (b.ok ? "" : " (no response)") : "not found";
+  $("dot-auth").className = "dot " + (s.authenticated ? "ok" : "bad");
+  $("auth-txt").textContent = s.authenticated ? "connected" : "not connected";
+  $("chip-home").classList.toggle("hidden", !s.home);
+  if (s.home) $("home-txt").textContent = s.home.name || ("home " + s.home.id);
+  $("chip-presence").classList.toggle("hidden", !s.authenticated);
+
+  $("setup").classList.toggle("hidden", s.authenticated);
+  if (s.authenticated && activateTimer) { clearInterval(activateTimer); activateTimer = null; }
+
+  const hk = s.homekit || {};
+  $("dot-bridge").title = hk.paired ? "HomeKit" : "REST";
+  if (hk.paired) $("bridge-txt").textContent = (b.ip || "bridge") + (b.ok ? " · HomeKit" : " (HomeKit, reconnecting)");
+  const needBridgeCard = !hk.paired && s.authenticated && (!b.ip || (b.ip && !b.ok));
+  $("bridge-card").classList.toggle("hidden", !needBridgeCard);
+  if (needBridgeCard) $("bridge-error").textContent = (b.error || "No tado bridge found on this network.") +
+    " Current bridge firmware no longer serves the local REST API — pair over HomeKit below instead.";
+  $("pair-card").classList.toggle("hidden", !!hk.paired);
+  $("empty").classList.toggle("hidden", !(b.ok && s.zones === 0));
+}
+
+// ---- device flow ---------------------------------------------------------------
+$("btn-connect").onclick = async () => {
+  try {
+    const r = await api("api/auth/device", {});
+    $("setup-start").classList.add("hidden");
+    $("setup-wait").classList.remove("hidden");
+    $("user-code").textContent = r.pending.user_code;
+    $("verify-link").href = r.pending.verification_uri_complete;
+    const exp = r.pending.expires_at * 1000;
+    clearInterval(activateTimer);
+    activateTimer = setInterval(async () => {
+      const left = Math.max(0, Math.round((exp - Date.now()) / 1000));
+      $("setup-countdown").textContent = left > 0 ? `waiting for login… (code expires in ${left}s)` : "code expired — click Connect again";
+      if (left <= 0) { clearInterval(activateTimer); activateTimer = null; return; }
+      try {
+        const a = await api("api/auth/activate", {});
+        if (a.completed) {
+          clearInterval(activateTimer); activateTimer = null;
+          toast("Connected — loading your home…");
+          renderStatus(a.status);
+          refresh();
+        }
+      } catch (e) { /* still pending or expired; countdown handles it */ }
+    }, 4000);
+  } catch (e) { toast(e.message, true); }
+};
+
+$("btn-rescan").onclick = async () => {
+  $("rescan-result").textContent = "scanning…";
+  try {
+    const r = await api("api/bridge/rescan", {});
+    $("rescan-result").textContent = r.found ? ("found " + r.found.name + " at " + r.found.ip) : "no bridge found";
+    renderStatus(r.status);
+  } catch (e) { $("rescan-result").textContent = e.message; }
+};
+
+$("btn-pair").onclick = async () => {
+  $("btn-pair").disabled = true;
+  $("pair-result").textContent = "pairing… (can take ~20 s)";
+  try {
+    const r = await api("api/homekit/pair", {body: {pin: $("pin").value}});
+    $("pair-result").textContent = `paired — ${r.zones} zone(s)`;
+    renderStatus(r.status);
+    refresh();
+  } catch (e) { $("pair-result").textContent = e.message; }
+  $("btn-pair").disabled = false;
+};
+
+$("btn-home").onclick = () => setPresence("HOME");
+$("btn-away").onclick = () => setPresence("AWAY");
+async function setPresence(mode) {
+  try {
+    await api("api/home/presence", {body: {mode}});
+    toast("Presence set to " + mode);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ---- zones ------------------------------------------------------------------------
+async function refresh() {
+  try {
+    const r = await api("api/zones");
+    renderStatus(r.status);
+    renderZones(r.zones);
+  } catch (e) { toast(e.message, true); }
+}
+
+let health = null;  // serial -> {online, battery, last_seen}, from "Check devices"
+
+$("btn-health").onclick = async () => {
+  $("health-txt").textContent = "asking tado…";
+  try {
+    health = (await api("api/devices/health")).devices;
+    const vals = Object.values(health);
+    const bad = vals.filter(h => h.online === false || (h.battery && h.battery !== "NORMAL")).length;
+    $("health-txt").textContent = bad ? `${bad} device(s) need attention` : `all ${vals.length} devices online, batteries OK`;
+    refresh();
+  } catch (e) { $("health-txt").textContent = e.message; }
+};
+
+function healthBadge(serial) {
+  if (!health) return "";
+  const h = health[serial];
+  if (!h) return '<span class="bad-txt">not known to tado</span>';
+  const parts = [h.online === false ? '<span class="bad-txt">OFFLINE</span>' : '<span class="ok-txt">online</span>'];
+  if (h.battery) parts.push(h.battery === "NORMAL" ? "battery ok" : '<span class="bad-txt">battery ' + h.battery.toLowerCase() + "</span>");
+  if (h.online === false && h.last_seen) parts.push("last seen " + new Date(h.last_seen).toLocaleString());
+  return parts.join(" · ");
+}
+
+function deviceLabel(z) {
+  const m = z.model || "";
+  const kind = m.startsWith("SRT") ? "Valve" : m.startsWith("ST") || m.startsWith("RU") ? "Wall thermostat" : "Device";
+  return kind + " " + (z.serial || z.id);
+}
+
+function groupRooms(zones) {
+  const rooms = new Map();
+  for (const z of zones) {
+    const key = z.room || ("device-" + z.id);
+    if (!rooms.has(key)) rooms.set(key, {name: z.room || deviceLabel(z), devices: []});
+    rooms.get(key).devices.push(z);
+  }
+  return [...rooms.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const avg = xs => { const v = xs.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+function renderZones(zones) {
+  const wrap = $("zones");
+  wrap.innerHTML = "";
+  const rooms = groupRooms(zones);
+  const hasRooms = zones.some(z => z.room);
+  $("summary").classList.toggle("hidden", !zones.length);
+  if (zones.length) {
+    const heating = rooms.filter(r => r.devices.some(d => d.state.activityDataPoints.heatingPower.percentage > 0)).length;
+    const off = rooms.filter(r => r.devices.every(d => d.state.setting.power === "OFF")).length;
+    $("summary").textContent = `${rooms.length} ${hasRooms ? "rooms" : "devices"} · ${heating} heating · ${off} off · ${rooms.length - heating - off} on (idle)` +
+      (hasRooms ? "" : " — connect the tado account to group devices by room");
+  }
+
+  for (const room of rooms) {
+    const devs = room.devices;
+    const st = d => d.state;
+    const cur = avg(devs.map(d => st(d).sensorDataPoints.insideTemperature.celsius));
+    const hum = avg(devs.map(d => st(d).sensorDataPoints.humidity.percentage));
+    const isOff = devs.every(d => st(d).setting.power === "OFF");
+    const isHeating = devs.some(d => st(d).activityDataPoints.heatingPower.percentage > 0);
+    const target = avg(devs.map(d => st(d).setting.temperature.celsius));
+    const caps = (devs[0].capabilities || {}).temperatures;
+    const t = caps ? caps.celsius : {min: 5, max: 25, step: 0.5};
+    const step = t.step >= 0.5 ? 0.5 : t.step;
+
+    const card = document.createElement("div");
+    card.className = "zone" + (isOff ? " is-off" : isHeating ? " is-heating" : "");
+    const status = isOff ? "off" : isHeating ? "heating" : "on · idle";
+    card.innerHTML = `
+      <div class="row" style="justify-content:space-between">
+        <h3></h3><span class="pill">${status}</span>
+      </div>
+      <div class="temp-row"><div class="cur">${cur != null ? fmtTemp(cur) + "<small>°C</small>" : "—"}</div>
+        <div class="muted">${isOff ? "heating off" : "target <b>" + fmtTemp(target) + "°C</b>"}${hum != null ? " · " + Math.round(hum) + "% humidity" : ""}</div></div>`;
+    card.querySelector("h3").textContent = room.name;
+
+    const all = (path, body) => Promise.all(devs.map(d => api(`api/zones/${d.id}/${path}`, body)));
+    const run = (p, msg) => p.then(() => { toast(room.name + " " + msg); setTimeout(refresh, 800); }).catch(e => toast(e.message, true));
+
+    const ctr = document.createElement("div");
+    ctr.className = "controls";
+    const stepper = document.createElement("div");
+    stepper.className = "stepper";
+    let want = target != null ? Math.round(target * 2) / 2 : (cur != null ? Math.round(cur) : 20);
+    const minus = document.createElement("button"); minus.textContent = "−";
+    const plus = document.createElement("button"); plus.textContent = "+";
+    const tgt = document.createElement("span"); tgt.className = "target";
+    const draw = () => tgt.textContent = fmtTemp(want) + "°";
+    draw();
+    let timer = null;
+    const send = () => { clearTimeout(timer); timer = setTimeout(() => run(all("set", {body: {celsius: want}}), "→ " + fmtTemp(want) + "°C"), 700); };
+    minus.onclick = () => { want = Math.max(t.min, want - step); draw(); send(); };
+    plus.onclick = () => { want = Math.min(t.max, want + step); draw(); send(); };
+    stepper.append(minus, tgt, plus);
+    ctr.appendChild(stepper);
+    const btn = (label, fn) => { const b = document.createElement("button"); b.className = "ghost"; b.textContent = label; b.onclick = fn; ctr.appendChild(b); };
+    if (isOff) btn("Turn on", () => run(all("set", {body: {celsius: want}}), "on at " + fmtTemp(want) + "°C"));
+    else btn("Off", () => run(all("off", {}), "heating off"));
+    btn("Boost", () => run(all("boost", {}), "boost"));
+    btn("Schedule", () => run(api(`api/zones/${devs[0].id}/overlay`, {method: "DELETE"}), "back to schedule"));
+    card.appendChild(ctr);
+
+    const list = document.createElement("div");
+    list.className = "devices";
+    for (const d of devs) {
+      const s = st(d);
+      const row = document.createElement("div");
+      row.innerHTML = `<span><span class="dev-name"></span><br><small>${healthBadge(d.serial)}</small></span>
+        <span class="row" style="gap:8px"><span>${fmtTemp(s.sensorDataPoints.insideTemperature.celsius)}°C · ${
+        s.setting.power === "OFF" ? "off" : (s.activityDataPoints.heatingPower.percentage > 0 ? "heating" : "on") + " → " + fmtTemp(s.setting.temperature.celsius) + "°"}</span>
+        <button class="ghost blink" title="make this device blink so you can find it">Blink</button></span>`;
+      row.querySelector(".dev-name").textContent = deviceLabel(d);
+      row.querySelector(".blink").onclick = () => api(`api/zones/${d.id}/identify`, {})
+        .then(() => toast(deviceLabel(d) + " is blinking")).catch(e => toast(e.message, true));
+      list.appendChild(row);
+    }
+    card.appendChild(list);
+    wrap.appendChild(card);
+  }
+}
+
+// ---- boot ---------------------------------------------------------------------------
+(async () => {
+  try {
+    const s = await api("api/status");
+    renderStatus(s);
+  } catch (e) { toast(e.message, true); }
+  refresh();
+  refreshTimer = setInterval(refresh, 8000);
+})();
+</script>
+</body>
+</html>
