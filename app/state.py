@@ -14,6 +14,7 @@ import httpx
 from .auth import AuthError, TadoAuth
 from .bridge import BridgeClient, discover_bridge
 from .homekit import HomeKitManager
+from .local import LocalStore
 
 log = logging.getLogger("tado-local")
 
@@ -36,6 +37,8 @@ class State:
         self.homekit = HomeKitManager(
             self.data_dir / "homekit.json", self.config.get("bridge_ip"), self.config.get("bridge_name")
         )
+        self.store = LocalStore(self.data_dir / "tado.db")
+        self.store.seed_from_cloud_cache(self.config.get("rooms") or {})
         self.http = httpx.AsyncClient(timeout=12)
         self.zones: dict[int, dict] = {}
         self.capabilities: dict[int, dict] = {}
@@ -73,7 +76,13 @@ class State:
         return self.config.get("bridge_ip")
 
     # -- HTTP helpers -------------------------------------------------------
+    @property
+    def local_only(self) -> bool:
+        return bool(self.config.get("local_only"))
+
     async def cloud_request(self, method: str, path: str, json_body: dict | None = None) -> httpx.Response:
+        if self.local_only:
+            raise StateError("local-only mode: this app doesn't contact tado.com", 409)
         token = await self.auth.ensure_access_token()
         return await self.http.request(
             method,
@@ -255,6 +264,7 @@ class State:
     # -- presentation ---------------------------------------------------------
     def status(self) -> dict:
         return {
+            "local_only": self.local_only,
             "authenticated": self.auth.is_authenticated(),
             "pending_device": self.auth.pending_info(),
             "home": {"id": self.home_id, "name": self.config.get("home_name")}
@@ -274,8 +284,13 @@ class State:
     def zones_payload(self) -> list[dict]:
         if self.homekit.is_paired():
             rows = self.homekit.zones_payload()
+            room_of = self.store.room_of()
+            if unknown := [r["serial"] for r in rows if r["serial"] not in room_of]:
+                self.store.register_devices(unknown)
+            names = {r["id"]: r["name"] for r in self.store.rooms()}
             for row in rows:
-                row["room_id"] = self.zone_ids.get(row["serial"])
+                row["room_id"] = room_of.get(row["serial"])
+                row["room"] = names.get(row["room_id"])
             return rows
         return [entry | {"id": zid} for zid, entry in sorted(self.zones.items())]
 

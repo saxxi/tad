@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from .auth import AuthError
 from .homekit import MODE_OFF
+from .local import run_scheduler
 from .state import State, StateError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -44,7 +45,9 @@ async def lifespan(app: FastAPI):
         log.warning("HomeKit controller failed to start: %s", exc)
     if not state.bridge_ip:
         asyncio.create_task(state.rescan_bridge())  # pre-fill bridge before login
+    scheduler = asyncio.create_task(run_scheduler(state.store, state.homekit))
     yield
+    scheduler.cancel()
     await state.close()
 
 
@@ -161,6 +164,62 @@ async def api_homekit_unpair():
         return {"ok": True}
     except Exception as exc:  # noqa: BLE001
         return err(exc)
+
+
+# -- local rooms + schedule ----------------------------------------------------------
+class RoomBody(BaseModel):
+    name: str
+
+
+class DeviceBody(BaseModel):
+    room_id: int | None = None
+
+
+class SchedulePoint(BaseModel):
+    days: str  # ISO weekdays, "12345" = Mon-Fri
+    time: str  # "HH:MM"
+    celsius: float | None = None  # None = off
+
+
+@app.get("/api/rooms")
+async def api_rooms():
+    return {"rooms": state.store.rooms()}
+
+
+@app.post("/api/rooms")
+async def api_room_add(body: RoomBody):
+    return {"id": state.store.add_room(body.name)}
+
+
+@app.patch("/api/rooms/{rid}")
+async def api_room_rename(rid: int, body: RoomBody):
+    state.store.rename_room(rid, body.name)
+    return {"ok": True}
+
+
+@app.delete("/api/rooms/{rid}")
+async def api_room_delete(rid: int):
+    state.store.delete_room(rid)
+    return {"ok": True}
+
+
+@app.put("/api/devices/{serial}")
+async def api_device_move(serial: str, body: DeviceBody):
+    state.store.move_device(serial, body.room_id)
+    return {"ok": True}
+
+
+@app.put("/api/rooms/{rid}/schedule")
+async def api_room_schedule(rid: int, points: list[SchedulePoint]):
+    for p in points:
+        hh, _, mm = p.time.partition(":")
+        if not (hh.isdigit() and mm.isdigit() and int(hh) < 24 and int(mm) < 60 and p.days and set(p.days) <= set("1234567")):
+            return JSONResponse({"detail": f"bad schedule entry: {p.days} {p.time}"}, status_code=422)
+        if p.celsius is not None and not 5 <= p.celsius <= 25:
+            return JSONResponse({"detail": "temperature must be 5-25 °C"}, status_code=422)
+    norm = lambda t: "%02d:%02d" % tuple(map(int, t.split(":")))  # "6:30" -> "06:30"
+    state.store.set_points(rid, [p.model_dump() | {"time": norm(p.time)} for p in points])
+    return {"ok": True}
 
 
 @app.get("/api/zones")

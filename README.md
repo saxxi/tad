@@ -18,8 +18,13 @@ directly after a one-time login.
    nobody, and only the factory-reset hole on the bridge (hold 10+ s) frees it.
 2. **Bridge address** — `bridge_ip`/`bridge_name` in `data/config.json`. The bridge is
    queried by unicast mDNS on that IP, which also works from Docker.
-3. **tado account (optional)** — OAuth2 device flow; adds room names, "Schedule"
-   (the bridge's HomeKit only accepts off/heat, so resume is one cloud call) and Home/Away.
+3. **Rooms and schedules are local** — `data/tado.db` (SQLite): rooms, which device is in
+   which room, and a weekly schedule per room. A background job applies each change
+   point over HomeKit; a manual change holds until the next point. Set tado's own
+   "manual control" setting to *until ended manually* so tado's schedule doesn't fight it.
+4. **Local-only mode** (`"local_only": true` in `data/config.json`) — the app never
+   contacts tado.com. Without it, an optional tado account adds Home/Away, a device
+   health check and a one-time import of the room list.
 
 ## Run
 
@@ -53,8 +58,9 @@ Docker Desktop starts (at login).
 ## Features
 
 - Dashboard per zone: current temperature, target, humidity, heating activity
-- Set temperature, boost (max temperature), heating off; over HomeKit these hold until
-  "Schedule" (no timers), which resumes via the cloud
+- Rooms grouped and named locally; "Edit rooms & schedules" to rename, add/delete rooms,
+  move devices and edit each room's weekly schedule
+- Set temperature, boost (max temperature), heating off — held until the next schedule change
 - Home/Away presence toggle
 - Per-device **Blink** (HomeKit identify) to find which valve is which; **Check devices**
   asks tado (one cloud call) whether each device is online and its battery state
@@ -68,6 +74,10 @@ GET    /api/zones
 POST   /api/zones/{id}/set       {"celsius": 21.5, "termination": "next"|"timer"|"manual", "duration_minutes": 60}
 POST   /api/zones/{id}/boost
 POST   /api/zones/{id}/identify     (blink)
+GET    /api/rooms                   (rooms, devices, schedule, next change)
+POST   /api/rooms {"name"} · PATCH /api/rooms/{id} {"name"} · DELETE /api/rooms/{id}
+PUT    /api/devices/{serial}        {"room_id": 3 | null}
+PUT    /api/rooms/{id}/schedule     [{"days": "12345", "time": "06:30", "celsius": 21}, {"days": "1234567", "time": "23:00", "celsius": null}]
 GET    /api/devices/health          (online/battery per device, one cloud call)
 POST   /api/zones/{id}/off
 DELETE /api/zones/{id}/overlay   (resume schedule)

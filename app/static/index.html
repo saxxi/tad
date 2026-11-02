@@ -58,6 +58,12 @@
   .devices { margin-top: 12px; border-top: 1px solid #26313d; padding-top: 8px; font-size: 12.5px; color: var(--muted); }
   .devices div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
   .temp-row { flex-wrap: wrap; }
+  .sched { margin-top: 12px; border-top: 1px solid #26313d; padding-top: 10px; font-size: 13px; }
+  .sched-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; }
+  .day { width: 26px; height: 26px; padding: 0; font-size: 11px; border-radius: 6px; background: var(--chip); color: var(--muted); }
+  .day.on { background: var(--accent); color: #1b100a; }
+  input, select { background: var(--panel2); color: var(--text); border: 1px solid #37455a; border-radius: 7px; padding: 4px 6px; font: inherit; }
+  .room-name { font-size: 15px; font-weight: 650; flex: 1; min-width: 120px; }
   .devices div { align-items: center; }
   .devices button.blink { padding: 3px 9px; font-size: 12px; }
   .ok-txt { color: var(--ok); } .bad-txt { color: var(--bad); font-weight: 700; }
@@ -127,7 +133,8 @@
 
   <div class="row" style="margin:0 0 12px;justify-content:space-between">
     <p class="muted hidden" id="summary" style="margin:0"></p>
-    <span class="row"><span class="muted" id="health-txt"></span><button class="ghost" id="btn-health">Check devices</button></span>
+    <span class="row"><span class="muted" id="health-txt"></span><button class="ghost" id="btn-health">Check devices</button>
+      <button class="ghost hidden" id="btn-addroom">+ New room</button><button class="ghost" id="btn-edit">Edit rooms &amp; schedules</button></span>
   </div>
   <div class="grid" id="zones"></div>
   <p class="muted hidden" id="empty">No zones yet — waiting for the bridge…</p>
@@ -185,12 +192,14 @@ function renderStatus(s) {
   $("dot-bridge").className = "dot" + (b.ok ? " ok" : b.ip ? " bad" : "");
   $("bridge-txt").textContent = b.ip ? b.ip + (b.ok ? "" : " (no response)") : "not found";
   $("dot-auth").className = "dot " + (s.authenticated ? "ok" : "bad");
-  $("auth-txt").textContent = s.authenticated ? "connected" : "not connected";
+  $("auth-txt").textContent = s.local_only ? "local only" : s.authenticated ? "tado account connected" : "tado account not connected";
+  if (s.local_only) $("dot-auth").className = "dot ok";
+  $("btn-health").classList.toggle("hidden", !!s.local_only);
   $("chip-home").classList.toggle("hidden", !s.home);
   if (s.home) $("home-txt").textContent = s.home.name || ("home " + s.home.id);
-  $("chip-presence").classList.toggle("hidden", !s.authenticated);
+  $("chip-presence").classList.toggle("hidden", !s.authenticated || !!s.local_only);
 
-  $("setup").classList.toggle("hidden", s.authenticated);
+  $("setup").classList.toggle("hidden", s.authenticated || !!s.local_only);
   if (s.authenticated && activateTimer) { clearInterval(activateTimer); activateTimer = null; }
 
   const hk = s.homekit || {};
@@ -264,8 +273,11 @@ async function setPresence(mode) {
 // ---- zones ------------------------------------------------------------------------
 async function refresh() {
   try {
-    const r = await api("api/zones");
+    const [r, rm] = await Promise.all([api("api/zones"), api("api/rooms")]);
     renderStatus(r.status);
+    roomsMeta = rm.rooms;
+    const active = document.activeElement;
+    if (editing && active && active.closest && active.closest("#zones") && active.tagName !== "BUTTON") return;
     renderZones(r.zones);
   } catch (e) { toast(e.message, true); }
 }
@@ -299,14 +311,93 @@ function deviceLabel(z) {
   return kind + " " + (z.serial || z.id);
 }
 
+// ---- local rooms + schedules (edit mode) ----------------------------------------------
+let roomsMeta = [];   // from api/rooms: [{id, name, devices, schedule, next}]
+let editing = false;
+const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+
+$("btn-edit").onclick = () => {
+  editing = !editing;
+  $("btn-edit").textContent = editing ? "Done" : "Edit rooms & schedules";
+  $("btn-edit").classList.toggle("active", editing);
+  $("btn-addroom").classList.toggle("hidden", !editing);
+  refresh();
+};
+$("btn-addroom").onclick = async () => {
+  const name = prompt("Room name");
+  if (name) { await api("api/rooms", {body: {name}}); refresh(); }
+};
+
+function scheduleEditor(room) {
+  const box = document.createElement("div");
+  box.className = "sched";
+  box.innerHTML = '<div class="muted" style="margin-bottom:4px">Weekly schedule — each line is a change: from that time on, the room goes to that temperature (empty = off).</div>';
+  const rows = document.createElement("div");
+  box.appendChild(rows);
+  const addRow = p => {
+    const row = document.createElement("div");
+    row.className = "sched-row";
+    const days = new Set((p.days || "12345").split(""));
+    DAYS.forEach((d, i) => {
+      const b = document.createElement("button");
+      b.className = "day" + (days.has(String(i + 1)) ? " on" : "");
+      b.textContent = d;
+      b.onclick = () => { const k = String(i + 1); days.has(k) ? days.delete(k) : days.add(k); b.classList.toggle("on"); };
+      row.appendChild(b);
+    });
+    const time = document.createElement("input"); time.type = "time"; time.value = p.time || "07:00";
+    const temp = document.createElement("input"); temp.type = "number"; temp.min = 5; temp.max = 25; temp.step = 0.5;
+    temp.placeholder = "off"; temp.value = p.celsius ?? (p.time ? "" : 20); temp.style.width = "70px";
+    const del = document.createElement("button"); del.className = "ghost"; del.textContent = "×"; del.onclick = () => row.remove();
+    row.append(time, temp, document.createTextNode("°C"), del);
+    row.read = () => ({days: [...days].sort().join(""), time: time.value, celsius: temp.value === "" ? null : Number(temp.value)});
+    rows.appendChild(row);
+  };
+  room.schedule.forEach(addRow);
+  const bar = document.createElement("div");
+  bar.className = "row";
+  bar.style.marginTop = "6px";
+  const add = document.createElement("button"); add.className = "ghost"; add.textContent = "+ add change"; add.onclick = () => addRow({});
+  const save = document.createElement("button"); save.className = "primary"; save.textContent = "Save schedule";
+  save.onclick = () => {
+    const points = [...rows.children].map(r => r.read()).filter(p => p.days && p.time);
+    api(`api/rooms/${room.id}/schedule`, {method: "PUT", body: points})
+      .then(() => toast(room.name + ": schedule saved (" + points.length + " changes)")).catch(e => toast(e.message, true));
+  };
+  bar.append(add, save);
+  box.appendChild(bar);
+  return box;
+}
+
+function roomEditorHead(room, card) {
+  const head = document.createElement("div");
+  head.className = "row";
+  const name = document.createElement("input");
+  name.className = "room-name"; name.value = room.name;
+  name.onchange = () => api(`api/rooms/${room.id}`, {method: "PATCH", body: {name: name.value}}).then(() => toast("renamed")).catch(e => toast(e.message, true));
+  const del = document.createElement("button"); del.className = "ghost"; del.textContent = "Delete room";
+  del.onclick = () => confirm(`Delete "${room.name}"? Its devices become unassigned.`) &&
+    api(`api/rooms/${room.id}`, {method: "DELETE"}).then(refresh);
+  head.append(name, del);
+  card.querySelector("h3").replaceWith(head);
+}
+
+function roomSelect(d) {
+  const sel = document.createElement("select");
+  sel.innerHTML = '<option value="">— unassigned —</option>' +
+    roomsMeta.map(r => `<option value="${r.id}">${r.name.replace(/</g, "&lt;")}</option>`).join("");
+  sel.value = d.room_id ?? "";
+  sel.onchange = () => api(`api/devices/${d.serial}`, {method: "PUT", body: {room_id: sel.value ? Number(sel.value) : null}}).then(refresh);
+  return sel;
+}
+
 function groupRooms(zones) {
-  const rooms = new Map();
-  for (const z of zones) {
-    const key = z.room || ("device-" + z.id);
-    if (!rooms.has(key)) rooms.set(key, {name: z.room || deviceLabel(z), devices: []});
-    rooms.get(key).devices.push(z);
-  }
-  return [...rooms.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const rooms = new Map(roomsMeta.map(r => [r.id, {...r, devices: []}]));
+  const unassigned = {id: null, name: "Unassigned devices", devices: [], schedule: []};
+  for (const z of zones) (rooms.get(z.room_id) || unassigned).devices.push(z);
+  const out = [...rooms.values()].filter(r => r.devices.length || editing);
+  if (unassigned.devices.length) out.push(unassigned);
+  return out;
 }
 
 const avg = xs => { const v = xs.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
@@ -314,18 +405,26 @@ const avg = xs => { const v = xs.filter(x => x != null); return v.length ? v.red
 function renderZones(zones) {
   const wrap = $("zones");
   wrap.innerHTML = "";
-  const rooms = groupRooms(zones);
-  const hasRooms = zones.some(z => z.room);
+  const rooms = groupRooms(zones).filter(r => r.devices.length || editing);
+  const live = rooms.filter(r => r.devices.length);
   $("summary").classList.toggle("hidden", !zones.length);
   if (zones.length) {
-    const heating = rooms.filter(r => r.devices.some(d => d.state.activityDataPoints.heatingPower.percentage > 0)).length;
-    const off = rooms.filter(r => r.devices.every(d => d.state.setting.power === "OFF")).length;
-    $("summary").textContent = `${rooms.length} ${hasRooms ? "rooms" : "devices"} · ${heating} heating · ${off} off · ${rooms.length - heating - off} on (idle)` +
-      (hasRooms ? "" : " — connect the tado account to group devices by room");
+    const heating = live.filter(r => r.devices.some(d => d.state.activityDataPoints.heatingPower.percentage > 0)).length;
+    const off = live.filter(r => r.devices.every(d => d.state.setting.power === "OFF")).length;
+    $("summary").textContent = `${live.length} rooms · ${heating} heating · ${off} off · ${live.length - heating - off} on (idle)`;
   }
 
   for (const room of rooms) {
     const devs = room.devices;
+    if (!devs.length) {  // empty room (edit mode only)
+      const card = document.createElement("div");
+      card.className = "zone";
+      card.innerHTML = '<h3></h3><p class="muted">No devices — move one here with its room selector.</p>';
+      roomEditorHead(room, card);
+      card.appendChild(scheduleEditor(room));
+      wrap.appendChild(card);
+      continue;
+    }
     const st = d => d.state;
     const cur = avg(devs.map(d => st(d).sensorDataPoints.insideTemperature.celsius));
     const hum = avg(devs.map(d => st(d).sensorDataPoints.humidity.percentage));
@@ -370,7 +469,7 @@ function renderZones(zones) {
     if (isOff) btn("Turn on", () => run(all("set", {body: {celsius: want}}), "on at " + fmtTemp(want) + "°C"));
     else btn("Off", () => run(all("off", {}), "heating off"));
     btn("Boost", () => run(all("boost", {}), "boost"));
-    btn("Schedule", () => run(api(`api/zones/${devs[0].id}/overlay`, {method: "DELETE"}), "back to schedule"));
+
     card.appendChild(ctr);
 
     const list = document.createElement("div");
@@ -385,9 +484,15 @@ function renderZones(zones) {
       row.querySelector(".dev-name").textContent = deviceLabel(d);
       row.querySelector(".blink").onclick = () => api(`api/zones/${d.id}/identify`, {})
         .then(() => toast(deviceLabel(d) + " is blinking")).catch(e => toast(e.message, true));
+      if (editing) row.querySelector(".blink").before(roomSelect(d));
       list.appendChild(row);
     }
     card.appendChild(list);
+    if (room.next && !editing) {
+      const nx = document.createElement("div"); nx.className = "muted"; nx.style.marginTop = "8px";
+      nx.textContent = "next: " + room.next; card.appendChild(nx);
+    }
+    if (editing && room.id != null) { roomEditorHead(room, card); card.appendChild(scheduleEditor(room)); }
     wrap.appendChild(card);
   }
 }
