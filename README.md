@@ -19,9 +19,12 @@ directly after a one-time login.
 2. **Bridge address** — `bridge_ip`/`bridge_name` in `data/config.json`. The bridge is
    queried by unicast mDNS on that IP, which also works from Docker.
 3. **Rooms and schedules are local** — `data/tado.db` (SQLite): rooms, which device is in
-   which room, and a weekly schedule per room. A background job applies each change
-   point over HomeKit; a manual change holds until the next point. Set tado's own
-   "manual control" setting to *until ended manually* so tado's schedule doesn't fight it.
+   which room, and a weekly schedule per room. A background job *enforces*
+   the current point over HomeKit every 30 s (tado's own schedule still runs on the bridge
+   and would drift the targets); a change made in the app holds until the room's next
+   point ("Resume schedule" ends it early). Turning a valve by hand gets reverted.
+   If the bridge stops answering, the app searches the /24 for it by its HomeKit name
+   (which contains the serial) and moves the pairing to the new IP.
 4. **Local-only mode** (`"local_only": true` in `data/config.json`) — the app never
    contacts tado.com. Without it, an optional tado account adds Home/Away, a device
    health check and a one-time import of the room list.
