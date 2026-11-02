@@ -489,8 +489,14 @@ function renderZones(zones) {
     }
     card.appendChild(list);
     if (room.next && !editing) {
-      const nx = document.createElement("div"); nx.className = "muted"; nx.style.marginTop = "8px";
-      nx.textContent = "next: " + room.next; card.appendChild(nx);
+      const nx = document.createElement("div"); nx.className = "row muted"; nx.style.marginTop = "8px";
+      nx.textContent = (room.held ? "manual — held until the next change: " : "schedule · next: ") + room.next;
+      if (room.held) {
+        const rs = document.createElement("button"); rs.className = "ghost"; rs.textContent = "Resume schedule";
+        rs.onclick = () => run(api(`api/rooms/${room.id}/resume`, {}), "back to its schedule");
+        nx.appendChild(rs);
+      }
+      card.appendChild(nx);
     }
     if (editing && room.id != null) { roomEditorHead(room, card); card.appendChild(scheduleEditor(room)); }
     wrap.appendChild(card);

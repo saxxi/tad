@@ -42,6 +42,31 @@ MODE_HEAT = 1
 MODE_AUTO = 3  # standard HAP; tado's bridge only accepts 0-1, so schedule resume goes via the cloud
 
 POLL_INTERVAL = 60.0  # events push changes; this is just a safety net
+RELOCATE_AFTER = 3  # failed polls before searching the subnet for the bridge
+
+
+async def locate_bridge(name: str, near_ip: str) -> str | None:
+    """Find the bridge by its HomeKit instance name (it embeds the serial, stable across
+    resets) by asking every address of near_ip's /24 directly: unicast mDNS, which works
+    from Docker, unlike multicast. A fresh Zeroconf keeps old cached addresses out."""
+    prefix = near_ip.rsplit(".", 1)[0]
+    azc = AsyncZeroconf()
+    try:
+        async def ask(ip: str) -> str | None:
+            info = AsyncServiceInfo("_hap._tcp.local.", f"{name}._hap._tcp.local.")
+            if await info.async_request(azc.zeroconf, 2000, addr=ip):
+                addrs = info.parsed_addresses()
+                return addrs[0] if addrs else ip
+            return None
+
+        candidates = [f"{prefix}.{i}" for i in range(1, 255)]
+        for k in range(0, len(candidates), 32):
+            for found in await asyncio.gather(*(ask(ip) for ip in candidates[k : k + 32])):
+                if found:
+                    return found
+        return None
+    finally:
+        await azc.async_close()
 
 
 def _stype(uuid: str) -> int:
@@ -71,6 +96,7 @@ class HomeKitManager:
         self.state: dict[int, dict] = {}  # aid -> live values
         self.names: dict[str, str] = {}  # serial -> cloud room name
         self._poll_task: asyncio.Task | None = None
+        self.on_bridge_moved = None  # callback(new_ip), set by the app to persist it
 
     # -- lifecycle -----------------------------------------------------------
     async def start(self) -> None:
@@ -227,6 +253,7 @@ class HomeKitManager:
             self._poll_task = asyncio.create_task(self._poller())
 
     async def _poller(self) -> None:
+        failures = 0
         while self.pairing:
             await asyncio.sleep(POLL_INTERVAL)
             try:
@@ -234,10 +261,43 @@ class HomeKitManager:
                     self._build_zones(await self.pairing.list_accessories_and_characteristics())
                 await self.refresh()
                 self.error = None
+                failures = 0
             except Exception as exc:  # noqa: BLE001
                 self.connected = False
                 self.error = str(exc) or type(exc).__name__
-                log.warning("homekit poll failed: %s", self.error)
+                failures += 1
+                log.warning("homekit poll failed (%d): %s", failures, self.error)
+                if failures >= RELOCATE_AFTER:
+                    failures = 0
+                    await self._relocate()
+
+    async def _relocate(self) -> None:
+        """The bridge stopped answering: look for it by name and move the pairing to its new IP."""
+        if not (self.bridge_name and self.bridge_ip):
+            return
+        log.info("looking for %s on the network...", self.bridge_name)
+        try:
+            ip = await locate_bridge(self.bridge_name, self.bridge_ip)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("bridge search failed: %s", exc)
+            return
+        if not ip or ip == self.bridge_ip:
+            log.info("bridge search: %s", "not found" if not ip else "same address, still not answering")
+            return
+        log.info("bridge moved: %s -> %s", self.bridge_ip, ip)
+        data = dict(self.pairing.pairing_data) | {"AccessoryIP": ip, "AccessoryIPs": [ip]}
+        try:
+            await self.pairing.close()
+        except Exception:  # noqa: BLE001
+            pass
+        self.controller.aliases.pop(self.alias, None)
+        self.pairing = self.controller.load_pairing(self.alias, data)
+        self.controller.save_data(str(self.storage))
+        self.bridge_ip = ip
+        if self.on_bridge_moved:
+            self.on_bridge_moved(ip)
+        self._wire_events()
+        await self._connect()
 
     def _all_chars(self) -> list[tuple[int, int]]:
         return [(aid, iid) for aid, z in self.zones.items() for iid in z["iids"].values()]

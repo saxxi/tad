@@ -203,6 +203,12 @@ async def api_room_delete(rid: int):
     return {"ok": True}
 
 
+@app.post("/api/rooms/{rid}/resume")
+async def api_room_resume(rid: int):
+    state.store.resume(rid)  # the scheduler re-applies the current point on its next tick
+    return {"ok": True}
+
+
 @app.put("/api/devices/{serial}")
 async def api_device_move(serial: str, body: DeviceBody):
     state.store.move_device(serial, body.room_id)
@@ -235,9 +241,10 @@ async def api_zone_set(zid: int, body: SetTempBody):
     if term is None:
         return JSONResponse({"detail": f"unknown termination '{body.termination}'"}, status_code=422)
     if state.homekit.is_paired():
-        # HomeKit has no termination types: this is a manual overlay until "Schedule"
+        # HomeKit has no termination types: the local schedule holds off until its next point
         try:
             await state.homekit.set_temperature(zid, body.celsius)
+            state.hold(zid)
             return {"ok": True}
         except Exception as exc:  # noqa: BLE001
             return err(exc)
@@ -271,6 +278,7 @@ async def api_zone_off(zid: int):
     if state.homekit.is_paired():
         try:
             await state.homekit.set_mode(zid, MODE_OFF)
+            state.hold(zid)
             return {"ok": True}
         except Exception as exc:  # noqa: BLE001
             return err(exc)
@@ -288,9 +296,10 @@ async def api_zone_off(zid: int):
 @app.post("/api/zones/{zid}/boost")
 async def api_zone_boost(zid: int):
     if state.homekit.is_paired():
-        # no timers over HomeKit: heat to max until "Schedule" is pressed
+        # no timers over HomeKit: heat to max until the room's next schedule point
         try:
             await state.homekit.set_temperature(zid, state.homekit.zones.get(zid, {}).get("max_temp", 25))
+            state.hold(zid)
             return {"ok": True}
         except Exception as exc:  # noqa: BLE001
             return err(exc)

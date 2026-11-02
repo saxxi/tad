@@ -37,6 +37,7 @@ class State:
         self.homekit = HomeKitManager(
             self.data_dir / "homekit.json", self.config.get("bridge_ip"), self.config.get("bridge_name")
         )
+        self.homekit.on_bridge_moved = self._bridge_moved
         self.store = LocalStore(self.data_dir / "tado.db")
         self.store.seed_from_cloud_cache(self.config.get("rooms") or {})
         self.http = httpx.AsyncClient(timeout=12)
@@ -76,6 +77,10 @@ class State:
         return self.config.get("bridge_ip")
 
     # -- HTTP helpers -------------------------------------------------------
+    def _bridge_moved(self, ip: str) -> None:
+        self.config["bridge_ip"] = ip
+        self._save_config()
+
     @property
     def local_only(self) -> bool:
         return bool(self.config.get("local_only"))
@@ -280,6 +285,11 @@ class State:
             "zones": len(self.homekit.zones) if self.homekit.is_paired() else len(self.zones),
             "last_poll": self.last_poll,
         }
+
+    def hold(self, aid: int) -> None:
+        """A change made in the app holds until the room's next schedule point."""
+        if serial := (self.homekit.zones.get(aid) or {}).get("serial"):
+            self.store.hold(serial)
 
     def zones_payload(self) -> list[dict]:
         if self.homekit.is_paired():

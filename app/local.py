@@ -1,9 +1,10 @@
 """Local rooms and weekly schedules (SQLite in data/), plus the scheduler loop.
 
 Replaces the tado cloud for naming/grouping and for the schedule: each room has
-weekly change points ("Mon-Fri 06:30 -> 21 °C"); at each one the scheduler sets
-the room's devices over HomeKit. A manual change holds until the next change
-point. The last applied point is stored, so a restart doesn't undo a manual change.
+weekly change points ("Mon-Fri 06:30 -> 21 °C"). The scheduler *enforces* the
+current point over HomeKit — tado's own schedule still runs on the bridge and
+would otherwise drift the targets — except while a room is on hold: a change
+made in this app holds until the room's next change point.
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS rooms (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    last_applied TEXT            -- key of the last schedule point applied (see _point_key)
+    last_applied TEXT,           -- unused (pre-enforcement scheduler)
+    hold_until TEXT              -- ISO time: manual change from the app holds until then
 );
 CREATE TABLE IF NOT EXISTS devices (
     serial TEXT PRIMARY KEY,
@@ -47,6 +49,8 @@ class LocalStore:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self.db.executescript(SCHEMA)
+        if "hold_until" not in {c["name"] for c in self.db.execute("PRAGMA table_info(rooms)")}:
+            self.db.execute("ALTER TABLE rooms ADD COLUMN hold_until TEXT")
 
     # -- seeding ---------------------------------------------------------------
     def seed_from_cloud_cache(self, rooms: dict[str, dict]) -> None:
@@ -72,15 +76,18 @@ class LocalStore:
 
     def rooms(self) -> list[dict]:
         out = []
-        for r in self.db.execute("SELECT id, name FROM rooms ORDER BY name"):
+        now = datetime.now(TZ)
+        for r in self.db.execute("SELECT id, name, hold_until FROM rooms ORDER BY name"):
             points = self.points(r["id"])
+            held = r["hold_until"] and datetime.fromisoformat(r["hold_until"]) > now
             out.append(
                 {
                     "id": r["id"],
                     "name": r["name"],
                     "devices": [d["serial"] for d in self.db.execute("SELECT serial FROM devices WHERE room_id = ?", (r["id"],))],
                     "schedule": points,
-                    "next": _describe(_next_point(points, datetime.now(TZ))),
+                    "next": _describe(_next_point(points, now)),
+                    "held": bool(held),
                 }
             )
         return out
@@ -116,23 +123,32 @@ class LocalStore:
             "INSERT INTO schedule (room_id, days, time, celsius) VALUES (?, ?, ?, ?)",
             [(rid, p["days"], p["time"], p.get("celsius")) for p in points],
         )
-        # the current point counts as applied, so saving doesn't immediately override a manual setting
-        cur = _current_point(self.points(rid), datetime.now(TZ))
-        self.db.execute("UPDATE rooms SET last_applied = ? WHERE id = ?", (_point_key(cur), rid))
+        self.db.execute("UPDATE rooms SET hold_until = NULL WHERE id = ?", (rid,))  # new schedule applies now
         self.db.commit()
 
-    def due(self, now: datetime) -> list[tuple[int, str, dict]]:
-        """Rooms whose current schedule point hasn't been applied yet."""
+    def hold(self, serial: str) -> None:
+        """A manual change from the app: the device's room holds it until its next change point."""
+        row = self.db.execute("SELECT room_id FROM devices WHERE serial = ?", (serial,)).fetchone()
+        if not row or row["room_id"] is None:
+            return
+        nxt = _next_point(self.points(row["room_id"]), datetime.now(TZ))
+        if nxt:
+            self.db.execute("UPDATE rooms SET hold_until = ? WHERE id = ?", (nxt["at"], row["room_id"]))
+            self.db.commit()
+
+    def resume(self, rid: int) -> None:
+        self.db.execute("UPDATE rooms SET hold_until = NULL WHERE id = ?", (rid,))
+        self.db.commit()
+
+    def targets(self, now: datetime) -> list[tuple[int, str, dict]]:
+        """(room id, name, current point) for every scheduled room that isn't on hold."""
         out = []
-        for r in self.db.execute("SELECT id, name, last_applied FROM rooms"):
-            cur = _current_point(self.points(r["id"]), now)
-            if cur and _point_key(cur) != r["last_applied"]:
+        for r in self.db.execute("SELECT id, name, hold_until FROM rooms"):
+            if r["hold_until"] and datetime.fromisoformat(r["hold_until"]) > now:
+                continue
+            if cur := _current_point(self.points(r["id"]), now):
                 out.append((r["id"], r["name"], cur))
         return out
-
-    def mark_applied(self, rid: int, point: dict) -> None:
-        self.db.execute("UPDATE rooms SET last_applied = ? WHERE id = ?", (_point_key(point), rid))
-        self.db.commit()
 
 
 # -- schedule maths -------------------------------------------------------------
@@ -163,10 +179,6 @@ def _next_point(points: list[dict], now: datetime) -> dict | None:
     return p | {"at": at.isoformat()}
 
 
-def _point_key(point: dict | None) -> str | None:
-    return point and f'{point["at"]}|{point.get("celsius")}'
-
-
 def _describe(point: dict | None) -> str | None:
     if not point:
         return None
@@ -186,15 +198,21 @@ async def run_scheduler(store: LocalStore, homekit) -> None:
             continue
         try:
             room_of = store.room_of()
-            by_serial = {z["serial"]: aid for aid, z in homekit.zones.items()}
-            for rid, name, point in store.due(datetime.now(TZ)):
-                aids = [aid for serial, aid in by_serial.items() if room_of.get(serial) == rid]
-                for aid in aids:
-                    if point.get("celsius") is None:
-                        await homekit.set_mode(aid, MODE_OFF)
-                    else:
-                        await homekit.set_temperature(aid, point["celsius"])
-                store.mark_applied(rid, point)
-                log.info("schedule: %s -> %s (%d devices)", name, point.get("celsius") or "off", len(aids))
+            for rid, name, point in store.targets(datetime.now(TZ)):
+                want = point.get("celsius")
+                fixed = 0
+                for aid, z in list(homekit.zones.items()):
+                    if room_of.get(z["serial"]) != rid:
+                        continue
+                    st = homekit.state.get(aid, {})
+                    if want is None:
+                        if st.get("target_hc") != MODE_OFF:
+                            await homekit.set_mode(aid, MODE_OFF)
+                            fixed += 1
+                    elif st.get("target_hc") == MODE_OFF or abs((st.get("target_temp") or 0) - want) > 0.05:
+                        await homekit.set_temperature(aid, want)
+                        fixed += 1
+                if fixed:
+                    log.info("schedule: %s -> %s (%d devices set)", name, "off" if want is None else f"{want:g}°", fixed)
         except Exception as exc:  # noqa: BLE001 - keep the loop alive; retried next tick
             log.warning("scheduler tick failed: %s", exc)
