@@ -2,97 +2,470 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="tado local">
 <title>tado° local</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
+    color-scheme: dark;
     --bg: #0f1419; --panel: #1a2129; --panel2: #232c36; --text: #e8eef4;
     --muted: #8fa1b3; --accent: #ff7a45; --ok: #35c46d; --bad: #e5534b;
-    --chip: #2b3644;
+    --chip: #2b3644; --line: #26313d; --axis: #37455a; --away: #6da7ec;
+    --tabbar: calc(60px + env(safe-area-inset-bottom));
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); padding-bottom: calc(var(--tabbar) + 16px);
          font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-           padding: 16px 22px; border-bottom: 1px solid #26313d; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px;
+           padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
   header h1 { font-size: 18px; margin: 0 auto 0 0; font-weight: 650; }
   header h1 span { color: var(--accent); }
-  .chip { background: var(--chip); border-radius: 999px; padding: 4px 12px;
-          font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
-  .chip b { color: var(--text); font-weight: 600; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
-  main { padding: 22px; max-width: 1100px; margin: 0 auto; }
-  .card { background: var(--panel); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+  nav { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; height: var(--tabbar); display: flex;
+        padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); }
+  nav a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+          color: var(--muted); font-size: 11.5px; font-weight: 600; text-decoration: none; }
+  nav a svg { width: 22px; height: 22px; }
+  nav a.on { color: var(--accent); }
+  main { padding: 16px; max-width: 1100px; margin: 0 auto; }
+  @media (min-width: 760px) {
+    body { padding-bottom: 24px; }
+    header { padding: 12px 22px; }
+    nav { position: static; height: auto; padding: 0; gap: 4px; background: none; border: 0; }
+    nav a { flex-direction: row; gap: 6px; font-size: 13.5px; padding: 6px 12px; border-radius: 9px; }
+    nav a svg { width: 17px; height: 17px; }
+    nav a.on { background: var(--panel2); }
+    main { padding: 22px; }
+  }
+  h2.page { font-size: 16px; margin: 22px 0 10px; font-weight: 650; }
+  .card { background: var(--panel); border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; }
+  .card h2 { margin: 0; font-size: 15px; font-weight: 650; }
+  .card .sub { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
   .hidden { display: none !important; }
-  button { cursor: pointer; border: 0; border-radius: 9px; padding: 8px 14px;
+  button { cursor: pointer; border: 0; border-radius: 9px; padding: 8px 14px; font-family: inherit;
            background: var(--panel2); color: var(--text); font-size: 13.5px; font-weight: 600; }
   button:hover { filter: brightness(1.15); }
   button.primary { background: var(--accent); color: #1b100a; }
-  button.ghost { background: transparent; border: 1px solid #37455a; color: var(--muted); }
+  button.ghost { background: transparent; border: 1px solid var(--axis); color: var(--muted); }
   button.active { outline: 2px solid var(--accent); }
   button:disabled { opacity: .45; cursor: default; }
+  :focus-visible { outline: 2px solid var(--away); outline-offset: 2px; }
+  a { color: var(--accent); }
+  input, select { background: var(--panel2); color: var(--text); border: 1px solid var(--axis); border-radius: 7px; padding: 4px 6px; font: inherit; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 4px 12px;
+          font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  .chip b { color: var(--text); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+
+  /* dashboard: house bar */
+  .notice { background: #3a1f1d; color: #ffc9c5; border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 13.5px; }
+  .away-card { display: flex; align-items: center; gap: 14px; }
+  .away-card.on { box-shadow: inset 0 0 0 2px var(--away); }
+  .away-card .txt { flex: 1; min-width: 0; }
+  .alert-item { display: block; margin-bottom: 8px; }
+  .alert-item b { display: block; }
+  .topic { display: block; margin: 8px 0; padding: 9px 10px; border-radius: 8px; background: var(--panel2); font: 13px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; user-select: all; }
+  .away-card b { font-size: 15px; }
+  .away-card p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+  .switch { flex: none; width: 56px; height: 34px; padding: 3px; border-radius: 999px; background: var(--chip); }
+  .switch::after { content: ""; display: block; width: 28px; height: 28px; border-radius: 50%; background: var(--text); transition: transform .15s; }
+  .switch[aria-checked="true"] { background: var(--away); }
+  .switch[aria-checked="true"]::after { transform: translateX(22px); }
+  dialog { background: var(--panel); color: var(--text); border: 0; border-radius: 16px; padding: 18px; width: min(440px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0, 0, 0, .6); }
+  dialog h2 { margin: 0 0 4px; font-size: 17px; }
+  dialog label { display: block; margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
+  dialog input, dialog select { width: 100%; padding: 9px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets button { padding: 7px 12px; }
+  .presets button.sel { background: var(--away); color: #08182c; }
+  .sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+  /* dashboard: figures */
+  .figures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .hero, .stat { background: var(--panel); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+  .hero { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .hero .num { font-size: 54px; line-height: 1.05; font-weight: 700; letter-spacing: -1.5px; }
+  .hero .num small { font-size: 24px; color: var(--muted); font-weight: 500; }
+  .label { color: var(--muted); font-size: 12.5px; }
+  .stat .val { font-size: 22px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .delta { color: var(--muted); font-size: 12px; }
+  @media (min-width: 760px) {
+    .figures { grid-template-columns: 1.6fr repeat(4, 1fr); }
+    .hero { grid-column: auto; flex-direction: column; gap: 2px; }
+  }
+
+  /* dashboard: room tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .tile { display: block; width: 100%; text-align: left; background: var(--panel); border-radius: 14px; padding: 12px 14px; font-weight: 400; }
+  .tile.sel { box-shadow: inset 0 0 0 2px var(--text); }
+  .tile .name { display: flex; align-items: center; gap: 7px; font-weight: 650; font-size: 14px; }
+  .tile .name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile .now { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin-top: 2px; }
+  .tile .now small { font-size: 15px; color: var(--muted); font-weight: 500; }
+  .tile .spark { display: block; width: 100%; }
+  .tile .line { color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .tile .line b { color: var(--text); font-weight: 600; }
+  .tile .state.heating { color: var(--accent); font-weight: 650; }
+
+  /* dashboard: filters + charts */
+  .filters { display: flex; gap: 8px; margin: 0 -16px 12px; padding: 2px 16px; overflow-x: auto; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .filters button { flex: none; padding: 7px 12px; display: inline-flex; align-items: center; gap: 6px; }
+  .filters button.sel { background: var(--text); color: var(--bg); }
+  .filters .sep { flex: none; width: 1px; background: var(--axis); margin: 4px 2px; }
+  .charts { transition: opacity .15s; }
+  .charts.loading { opacity: .55; }
+  .chart { position: relative; touch-action: pan-y; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart svg.pointer:focus { outline: none; }  /* the focus ring is for keyboard readers */
+  .chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .grid-line { stroke: var(--line); stroke-width: 1; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .key-line { width: 14px; height: 2px; border-radius: 1px; }
+  .key-box { width: 10px; height: 10px; border-radius: 3px; }
+  .empty-chart { color: var(--muted); font-size: 13px; padding: 26px 0; text-align: center; }
+  #tip { position: fixed; z-index: 20; pointer-events: none; background: #0b0f13; border: 1px solid var(--axis); border-radius: 9px;
+         padding: 7px 10px; font-size: 12.5px; min-width: 120px; max-width: 250px; display: none; }
+  #tip .t { color: var(--muted); font-size: 11.5px; margin-bottom: 3px; }
+  #tip .r { display: flex; align-items: center; gap: 7px; }
+  #tip .r b { font-weight: 650; font-variant-numeric: tabular-nums; }
+  #tip .r span:last-child { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  details.twin { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  details.twin summary { cursor: pointer; }
+  .scroll { overflow-x: auto; max-height: 280px; margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { color: var(--muted); font-weight: 600; text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+  td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  @media (max-width: 500px) { #room-table { font-size: 12.5px; } #room-table th, #room-table td { padding: 6px 3px; } #room-table td:first-child { white-space: normal; } }
+  td .room-key { display: inline-flex; align-items: center; gap: 7px; }
+  .scale { display: flex; align-items: center; gap: 3px; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+  .scale i { width: 18px; height: 10px; border-radius: 2px; display: block; }
+  .scale span { margin: 0 5px; }
+  .foot { color: var(--muted); font-size: 12px; text-align: center; margin: 4px 0 8px; }
+
+  /* mobile: tab bar, quick button, sheets, swipes */
+  nav a, nav button.fab { -webkit-tap-highlight-color: transparent; }
+  .badge-dot { position: absolute; margin: -22px 0 0 20px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--bad); color: #fff; font-size: 10.5px; line-height: 16px; text-align: center; }
+  nav .fab-wrap { flex: 1; display: flex; justify-content: center; }
+  nav button.fab { width: 56px; height: 56px; margin-top: -18px; padding: 0; border-radius: 50%; background: var(--accent); color: #1b100a; box-shadow: 0 4px 14px rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; transition: transform .15s; }
+  nav button.fab svg { width: 26px; height: 26px; }
+  nav button.fab:active { transform: scale(.92); }
+  @media (min-width: 760px) {
+    nav .fab-wrap { flex: none; }
+    nav button.fab { width: 34px; height: 34px; margin: 0; box-shadow: none; }
+    nav button.fab svg { width: 18px; height: 18px; }
+    .badge-dot { position: static; margin: 0 0 0 2px; }
+  }
+  dialog.sheet { margin: auto auto 0; width: min(560px, 100vw); max-width: 100vw; max-height: 86vh; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 8px 18px calc(18px + env(safe-area-inset-bottom)); }
+  dialog.sheet[open] { animation: sheet-up .2s ease-out; }
+  @keyframes sheet-up { from { transform: translateY(40%); opacity: .4; } }
+  .handle { display: block; width: 100%; padding: 8px 0 14px; touch-action: none; cursor: grab; background: none; }
+  .handle::after { content: ""; display: block; width: 38px; height: 5px; margin: 0 auto; border-radius: 3px; background: var(--axis); }
+  .action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0; }
+  .action-grid button { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; padding: 13px; min-height: 72px; border-radius: 13px; }
+  .action-grid button small { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .action-grid button.on { box-shadow: inset 0 0 0 2px var(--accent); }
+  .sheet-title { margin: 12px 0 2px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .swipe { position: relative; border-radius: 14px; overflow: hidden; touch-action: pan-y; background: var(--panel2); }
+  .swipe .under { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 18px; font-weight: 650; font-size: 13.5px; opacity: 0; }
+  .swipe .under.warm { background: #6b3a22; color: #ffe2d3; justify-content: flex-start; }
+  .swipe .under.cool { background: #184f95; color: #dcebff; justify-content: flex-end; }
+  .swipe .tile, .swipe .issue { position: relative; transition: transform .18s ease-out; margin: 0; }
+  .swipe.dragging .tile, .swipe.dragging .issue { transition: none; }
+  .tile .flag { color: #ffc9c5; font-size: 12px; font-weight: 650; }
+  .home-head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin: 0 0 12px; }
+  .home-head .big { font-size: 34px; font-weight: 700; letter-spacing: -.8px; line-height: 1.1; }
+  .home-head .big small { font-size: 16px; color: var(--muted); font-weight: 500; }
+  .home-head span { color: var(--muted); font-size: 13px; }
+  .home-head b { color: var(--text); font-weight: 650; }
+  .issue { display: flex; gap: 10px; align-items: flex-start; background: #3a1f1d; color: #ffc9c5; padding: 12px 14px; font-size: 13.5px; border-radius: 14px; }
+  .issue.window { background: #1d2f45; color: #cfe3fb; }
+  .issue .ic { font-size: 18px; line-height: 1.2; flex: none; }
+  .issue .tx { flex: 1; min-width: 0; }
+  .issue b { display: block; font-weight: 650; }
+  .issue .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .issue .acts button { padding: 6px 11px; font-size: 12.5px; background: rgba(255, 255, 255, .12); color: inherit; }
+  #issues .swipe { margin-bottom: 8px; background: var(--panel); }
+  #issues .under { background: var(--panel2); color: var(--muted); justify-content: center; }
+  .air-verdict { font-size: 17px; font-weight: 650; margin: 2px 0; }
+  .air-strip { display: flex; gap: 3px; overflow-x: auto; margin: 10px -18px 4px; padding: 16px 18px 4px; scrollbar-width: none; }
+  .air-strip::-webkit-scrollbar { display: none; }
+  .air-cell { flex: none; width: 38px; padding: 0; background: none; border-radius: 7px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-weight: 500; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; position: relative; }
+  .air-cell .col { width: 100%; height: 62px; display: flex; align-items: flex-end; }
+  .air-cell .bar { width: 100%; border-radius: 4px 4px 0 0; background: #3b4a5c; display: flex; justify-content: center; padding-top: 2px; color: var(--text); font-size: 11px; min-height: 18px; }
+  .air-cell.avoid .bar { box-shadow: inset 0 0 0 1px var(--axis); }
+  .air-cell.best .bar { background: #0ca30c; color: #fff; font-weight: 700; }
+  .air-cell.avoid .bar { background: #232c36; color: var(--muted); }
+  .air-cell.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+  .air-cell .daylabel { position: absolute; top: -15px; left: 0; white-space: nowrap; color: var(--text); font-weight: 650; }
+  .air-read { min-height: 20px; font-size: 13px; color: var(--muted); margin: 6px 0; }
+  .air-read b { color: var(--text); font-weight: 650; }
+  .air-events { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .air-events div { padding: 2px 0; }
+  .air-events b { color: var(--text); font-weight: 600; }
+  .room-now { display: flex; align-items: baseline; gap: 10px; margin: 2px 0 8px; flex-wrap: wrap; }
+  .room-now .cur { font-size: 46px; }
+  .view-in-l { animation: in-l .18s ease-out; } .view-in-r { animation: in-r .18s ease-out; }
+  @keyframes in-l { from { transform: translateX(26px); opacity: .5; } }
+  @keyframes in-r { from { transform: translateX(-26px); opacity: .5; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  #toast.undo { pointer-events: auto; display: flex; gap: 14px; align-items: center; }
+  #toast button { padding: 3px 10px; color: var(--accent); background: none; }
+  /* small blocks: all rooms on one row on a phone */
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; margin-bottom: 10px; }
+  @media (min-width: 760px) { .tiles { grid-template-columns: repeat(auto-fill, minmax(92px, 104px)); gap: 8px; } }
+  .swipe:has(.tile) { border-radius: 12px; }
+  .tile { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; min-height: 70px; height: 100%; padding: 6px 6px 5px; border-radius: 12px; }
+  .tile .name { display: block; font-size: 10.5px; line-height: 1.15; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; min-height: 24px; }
+  .tile .name .dot { display: inline-block; width: 6px; height: 6px; margin-right: 3px; vertical-align: 1px; }
+  .tile .now { margin: 0; font-size: 18px; letter-spacing: -.4px; line-height: 1.1; white-space: nowrap; }
+  .tile .now small { font-size: 11px; }
+  .tile .line { font-size: 10.5px; line-height: 1.15; white-space: nowrap; overflow: hidden; }
+  .tile.is-heating { box-shadow: inset 0 -3px 0 var(--accent); }
+  .tile.held { box-shadow: inset 0 0 0 1.5px var(--away); }
+  .tile.has-issue { box-shadow: inset 0 0 0 1.5px var(--bad); }
+  .tile.od { background: var(--panel2); }
+  .tile.od.on { box-shadow: inset 0 0 0 2px var(--accent); }
+  .swipe .under { padding: 0 8px; font-size: 11px; }
+  #issues .under { font-size: 13px; }
+  .manual-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--panel); border-radius: 12px; padding: 7px 8px 7px 12px; margin-bottom: 10px; font-size: 12.5px; color: var(--muted); }
+  .manual-row button { flex: none; padding: 6px 10px; font-size: 12.5px; color: var(--away); }
+  .sheet .wide { width: 100%; margin-top: 10px; padding: 11px; }
+  .sheet .spark { display: block; width: 100%; height: 34px; margin: 8px 0 0; }
+
+  .tile.dial-block.up { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .tile.dial-block.down { box-shadow: inset 0 0 0 1.5px var(--away); }
+  .dial-wrap { display: flex; flex-direction: column; align-items: center; }
+  .dial-svg { width: min(260px, 72vw); touch-action: none; cursor: grab; display: block; }
+  .dial-svg:focus-visible { outline: 2px solid var(--away); outline-offset: 2px; border-radius: 50%; }
+  .dial-value { font-size: 40px; font-weight: 700; letter-spacing: -1px; fill: var(--text); }
+  .dial-unit { font-size: 12px; fill: var(--muted); }
+  .dial-row { display: flex; align-items: center; gap: 10px; margin-top: -6px; }
+  .dial-row button { width: 46px; height: 42px; padding: 0; font-size: 20px; }
+  .dial-row button.reset { width: auto; padding: 0 14px; font-size: 13px; }
+
+  /* phone: tighter everywhere */
+  @media (max-width: 759px) {
+    main { padding: 10px 12px; }
+    .card { padding: 11px 13px; margin-bottom: 10px; }
+    .home-head { margin-bottom: 8px; }
+    .home-head .big { font-size: 26px; }
+    .home-head span { font-size: 12px; }
+    .figures, main .cost-stats { grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+    .hero { padding: 8px 12px; }
+    .hero .num { font-size: 34px; letter-spacing: -1px; }
+    .hero .num small { font-size: 16px; }
+    .stat { padding: 7px 7px 6px; min-height: 70px; border-radius: 12px; }
+    .stat .label { font-size: 10.5px; line-height: 1.15; }
+    .stat .val { font-size: 15px; margin-top: 2px; }
+    .stat .delta { font-size: 10px; line-height: 1.2; }
+    main .cost-hero { padding: 10px 13px; margin-bottom: 8px; }
+    main .cost-hero .num { font-size: 38px; letter-spacing: -1px; }
+    main .cost-hero .range { font-size: 12.5px; }
+    main .cost-hero .why { font-size: 11.5px; margin-top: 5px; }
+    main .room-cost { padding: 5px 0; font-size: 12.5px; }
+    main .room-cost small { font-size: 11px; }
+  }
+  .issue { padding: 8px 11px; font-size: 12.5px; }
+  .issue details { flex: 1; min-width: 0; }
+  .issue summary { display: flex; align-items: center; gap: 8px; font-weight: 650; cursor: pointer; list-style: none; }
+  .issue summary::-webkit-details-marker { display: none; }
+  .issue summary .tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .issue summary .ic { font-size: 14px; }
+  .issue summary::after { content: "▾"; opacity: .7; }
+  .issue details[open] summary::after { content: "▴"; }
+  .issue .more { margin-top: 5px; }
+  #issues .swipe { margin-bottom: 6px; border-radius: 12px; }
+  #air-card h2 { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .air-verdict { font-size: 15px; margin: 1px 0; }
+  #air-sub { font-size: 12px; line-height: 1.35; }
+  .air-strip { padding-top: 14px; margin-top: 6px; gap: 2px; }
+  .air-cell { width: 30px; font-size: 10px; gap: 2px; }
+  .air-cell .col { height: 40px; }
+  .air-cell .bar { font-size: 10px; min-height: 14px; }
+  .air-cell .daylabel { top: -13px; font-size: 10px; }
+  .air-read { font-size: 12px; margin: 4px 0; min-height: 16px; }
+  #air-legend { margin: 0; font-size: 11px; }
+  .action-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+  .action-grid button { min-height: 66px; padding: 8px; font-size: 12.5px; border-radius: 12px; gap: 2px; }
+  .action-grid button small { font-size: 10.5px; line-height: 1.2; }
+
+  /* costs */
+  .cost-hero { background: var(--panel); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
+  .cost-hero .num { font-size: 54px; line-height: 1.05; font-weight: 700; letter-spacing: -1.5px; }
+  .cost-hero .range { font-size: 14px; margin-top: 2px; }
+  .cost-hero .why { color: var(--muted); font-size: 12.5px; margin: 8px 0 0; }
+  .badge { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 650; background: var(--chip); color: var(--text); margin-left: 6px; vertical-align: middle; }
+  .cost-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  @media (min-width: 760px) { .cost-stats { grid-template-columns: repeat(4, 1fr); } }
+  .room-cost { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .room-cost:last-child { border-bottom: 0; }
+  .room-cost .nm { display: flex; align-items: center; gap: 7px; min-width: 0; font-weight: 600; }
+  .room-cost .nm span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room-cost b { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .room-cost .track { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; }
+  .room-cost .track i { display: block; height: 100%; border-radius: 4px; }
+  .room-cost small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+  .field { display: block; margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+  .field input { display: block; width: 100%; margin-top: 4px; padding: 10px; font-size: 16px; color: var(--text); }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 12px; }
+  .meter-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .outlook { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 12px; color: var(--muted); }
+  .outlook b { display: block; color: var(--text); font-size: 15px; font-weight: 650; }
+
+  /* settings */
   .setup h2 { margin: 0 0 8px; font-size: 16px; }
   .setup ol { color: var(--muted); padding-left: 20px; margin: 10px 0 14px; }
   .code { font-family: ui-monospace, Menlo, monospace; font-size: 26px; letter-spacing: 4px;
           background: var(--panel2); border-radius: 10px; padding: 10px 18px; display: inline-block; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .zone { background: var(--panel); border-radius: 14px; padding: 18px 20px; position: relative; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+  .zone { background: var(--panel); border-radius: 14px; padding: 18px 20px; position: relative; scroll-margin-top: 70px; min-width: 0; }
+  .zone.flash { box-shadow: inset 0 0 0 2px var(--text); }
   .zone h3 { margin: 0; font-size: 15.5px; font-weight: 650; }
-  .zone .type { color: var(--muted); font-size: 12px; text-transform: lowercase; }
-  .temp-row { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 4px; }
+  .temp-row { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 4px; flex-wrap: wrap; }
   .cur { font-size: 42px; font-weight: 700; letter-spacing: -1px; }
   .cur small { font-size: 20px; color: var(--muted); font-weight: 500; }
-  .meta { color: var(--muted); font-size: 12.5px; display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
-  .heatbadge { color: var(--accent); font-weight: 700; font-size: 12.5px; }
   .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .stepper { display: flex; align-items: center; gap: 10px; background: var(--panel2);
-             border-radius: 10px; padding: 4px 8px; }
-  .stepper button { width: 34px; height: 34px; padding: 0; font-size: 18px; border-radius: 8px; }
+  .stepper { display: flex; align-items: center; gap: 10px; background: var(--panel2); border-radius: 10px; padding: 4px 8px; }
+  .stepper button { width: 38px; height: 38px; padding: 0; font-size: 18px; border-radius: 8px; }
   .stepper .target { min-width: 52px; text-align: center; font-size: 17px; font-weight: 650; }
   .pill { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 10px; background: var(--chip); color: var(--ok); }
   .zone.is-heating .pill { background: #3a2417; color: var(--accent); }
   .zone.is-heating { box-shadow: inset 3px 0 0 var(--accent); }
   .zone.is-off .pill { color: var(--muted); }
   .zone.is-off .cur { color: var(--muted); }
-  .devices { margin-top: 12px; border-top: 1px solid #26313d; padding-top: 8px; font-size: 12.5px; color: var(--muted); }
-  .devices div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
-  .temp-row { flex-wrap: wrap; }
-  .sched { margin-top: 12px; border-top: 1px solid #26313d; padding-top: 10px; font-size: 13px; }
-  .sched-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; }
-  .day { width: 26px; height: 26px; padding: 0; font-size: 11px; border-radius: 6px; background: var(--chip); color: var(--muted); }
-  .day.on { background: var(--accent); color: #1b100a; }
-  input, select { background: var(--panel2); color: var(--text); border: 1px solid #37455a; border-radius: 7px; padding: 4px 6px; font: inherit; }
-  .room-name { font-size: 15px; font-weight: 650; flex: 1; min-width: 120px; }
-  .devices div { align-items: center; }
+  .devices { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .devices > div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; align-items: center; flex-wrap: wrap; }
   .devices button.blink { padding: 3px 9px; font-size: 12px; }
+  .sched { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 13px; }
+  .sched-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 0; }
+  .day { width: 30px; height: 30px; padding: 0; font-size: 11px; border-radius: 6px; background: var(--chip); color: var(--muted); }
+  .day.on { background: var(--accent); color: #1b100a; }
+  .room-name { font-size: 15px; font-weight: 650; flex: 1; min-width: 120px; }
   .ok-txt { color: var(--ok); } .bad-txt { color: var(--bad); font-weight: 700; }
-  .override { margin-top: 10px; font-size: 12.5px; color: var(--muted); background: var(--panel2);
-              border-radius: 8px; padding: 6px 10px; display: inline-block; }
-  .override b { color: var(--accent); }
-  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-           background: var(--panel2); border: 1px solid #37455a; padding: 10px 18px;
+  .check { display: inline-flex; align-items: center; gap: 6px; }
+  .check input { width: 18px; height: 18px; }
+  #toast { position: fixed; z-index: 30; bottom: calc(var(--tabbar) + 12px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
+           background: var(--panel2); border: 1px solid var(--axis); padding: 10px 18px;
            border-radius: 10px; font-size: 13.5px; opacity: 0; transition: opacity .25s; pointer-events: none; }
   #toast.show { opacity: 1; }
   #toast.err { border-color: var(--bad); color: #ffb3ae; }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .muted { color: var(--muted); font-size: 13px; }
-  a { color: var(--accent); }
 </style>
 </head>
 <body>
 <header>
   <h1>tado<span>°</span> local</h1>
-  <span class="chip" id="chip-bridge"><span class="dot" id="dot-bridge"></span>bridge <b id="bridge-txt">…</b></span>
-  <span class="chip" id="chip-auth"><span class="dot" id="dot-auth"></span><b id="auth-txt">…</b></span>
-  <span class="chip hidden" id="chip-home"><b id="home-txt"></b></span>
-  <button class="ghost hidden" id="btn-signout" title="forget the login in this browser">Sign out</button>
-  <span class="chip hidden" id="chip-presence">presence
-    <button class="ghost" style="padding:2px 10px" id="btn-home">Home</button>
-    <button class="ghost" style="padding:2px 10px" id="btn-away">Away</button>
-  </span>
+  <nav aria-label="Main">
+    <a href="#/" id="nav-dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M6 10v10h12V10"/></svg>
+      Home<span class="badge-dot hidden" id="issue-badge"></span></a>
+    <a href="#/charts" id="nav-charts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-6 4 3 8-9M3 21h18"/></svg>
+      Charts</a>
+    <span class="fab-wrap"><button class="fab" id="fab" aria-label="Quick actions" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></button></span>
+    <a href="#/costs" id="nav-costs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6.5A7 7 0 1 0 18 17.5M3 10.5h10M3 13.5h10"/></svg>
+      Costs</a>
+    <a href="#/settings" id="nav-settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+      Settings</a>
+  </nav>
 </header>
-<main>
+
+<main id="view-dashboard">
+  <a class="notice hidden" id="bridge-notice" href="#/settings" style="display:block;text-decoration:none"></a>
+
+  <div class="home-head" id="home-head"></div>
+  <div id="issues" role="status"></div>
+  <div class="card" id="air-card">
+    <h2>Fresh air</h2>
+    <p class="air-verdict" id="air-verdict"></p>
+    <p class="sub" id="air-sub" style="margin:0"></p>
+    <div class="air-strip" id="air-strip" role="group" aria-label="Airing by hour"></div>
+    <div class="air-read" id="air-read"></div>
+    <div class="legend" id="air-legend"></div>
+    <details class="twin" id="twin-air" style="margin-top:4px"><summary>Today's windows and all hours</summary><div class="air-events" id="air-events"></div></details>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <div id="manual-rows"></div>
+  <p class="foot">Tap a room for controls. Swipe it right to warm, left for off.</p>
+</main>
+
+<main id="view-charts" class="hidden">
+  <div class="figures" id="figures"></div>
+  <div class="filters" id="filters" aria-label="Chart filters"></div>
+  <div class="charts" id="charts">
+    <div class="card"><h2 id="temp-title">Temperature</h2><p class="sub" id="temp-sub"></p><div class="legend" id="temp-legend"></div><div class="chart" id="chart-temp"></div><details class="twin" id="twin-temp"><summary>View as table</summary></details></div>
+    <div class="card"><h2>Humidity</h2><p class="sub">Above 60% for long periods encourages mould.</p><div class="legend" id="hum-legend"></div><div class="chart" id="chart-hum"></div><details class="twin" id="twin-hum"><summary>View as table</summary></details></div>
+    <div class="card"><h2>Heating time</h2><p class="sub" id="bars-sub"></p><div class="legend" id="bars-legend"></div><div class="chart" id="chart-bars"></div><details class="twin" id="twin-bars"><summary>View as table</summary></details></div>
+    <div class="card"><h2>When the heating runs</h2><p class="sub" id="heat-sub"></p><div class="chart" id="chart-heat"></div><div class="scale" id="heat-scale"></div><details class="twin" id="twin-heat"><summary>View as table</summary></details></div>
+    <div class="card"><h2>Rooms compared</h2><p class="sub" id="table-sub"></p><div class="scroll" style="max-height:none"><table id="room-table"></table></div></div>
+  </div>
+  <p class="foot" id="foot"></p>
+</main>
+
+<main id="view-costs" class="hidden">
+  <div id="cost-wait" class="card hidden"><p class="muted" id="cost-reason" style="margin:0"></p></div>
+  <div id="cost-body" class="hidden">
+    <div class="cost-hero">
+      <div class="label">Heating this season<span class="badge" id="cost-badge"></span></div>
+      <div class="num" id="cost-total"></div>
+      <div class="range" id="cost-range"></div>
+      <p class="why" id="cost-why"></p>
+    </div>
+    <div class="cost-stats" id="cost-stats"></div>
+    <div class="card"><h2>Season so far and ahead</h2><p class="sub" id="cost-chart-sub"></p><div class="legend" id="cost-legend"></div><div class="chart" id="chart-cost"></div><details class="twin" id="twin-cost"><summary>View as table</summary></details></div>
+    <div class="card"><h2>Next 7 days outside</h2><p class="sub">Average temperature each day.</p><div class="outlook" id="cost-outlook"></div></div>
+    <div class="card"><h2>Who costs what</h2><p class="sub" id="cost-rooms-sub"></p><div id="cost-rooms"></div></div>
+    <div class="card"><h2>By month</h2><p class="sub">Each month's share of the forecast. Colder months cost more.</p><div class="scroll" style="max-height:none"><table id="cost-months"></table></div></div>
+  </div>
+  <div class="card">
+    <h2>Price and budget</h2>
+    <div class="form-grid">
+      <label class="field">Gas price, all included (€/Smc)<input id="set-price" type="number" inputmode="decimal" min="0.1" max="10" step="0.01"></label>
+      <label class="field">Season budget (€, optional)<input id="set-budget" type="number" inputmode="decimal" min="1" step="10"></label>
+    </div>
+    <details class="twin"><summary>Assumptions</summary>
+      <div class="form-grid">
+        <label class="field">Heat per open valve (kW)<input id="set-kw" type="number" inputmode="decimal" min="0.1" max="10" step="0.1"></label>
+        <label class="field">Boiler efficiency (%)<input id="set-eff" type="number" inputmode="decimal" min="50" max="110" step="1"></label>
+        <label class="field">Hot water and cooking (Smc/day)<input id="set-other" type="number" inputmode="decimal" min="0" max="10" step="0.1"></label>
+      </div>
+    </details>
+    <div class="sheet-actions"><button class="primary" id="set-save">Save</button></div>
+  </div>
+</main>
+
+<main id="view-settings" class="hidden">
+  <div class="card away-card" id="away-card">
+    <div class="txt"><b id="away-title">…</b><p id="away-sub"></p></div>
+    <button class="switch" id="away-switch" role="switch" aria-checked="false" aria-label="Away mode for the entire house"></button>
+  </div>
+  <div class="card">
+    <h2 style="margin-bottom:10px">System</h2>
+    <div class="row">
+      <span class="chip" id="chip-bridge"><span class="dot" id="dot-bridge"></span>bridge <b id="bridge-txt">…</b></span>
+      <span class="chip" id="chip-auth"><span class="dot" id="dot-auth"></span><b id="auth-txt">…</b></span>
+      <span class="chip hidden" id="chip-home"><b id="home-txt"></b></span>
+      <span class="chip hidden" id="chip-presence">tado presence
+        <button class="ghost" style="padding:2px 10px" id="btn-home">Home</button>
+        <button class="ghost" style="padding:2px 10px" id="btn-away">Away</button>
+      </span>
+      <button class="ghost hidden" id="btn-signout" title="forget the login in this browser">Sign out</button>
+    </div>
+  </div>
+
   <div class="card setup hidden" id="setup">
     <h2>Connect your tado° account</h2>
     <div id="setup-start">
@@ -125,12 +498,32 @@
       The bridge can have only one HomeKit owner, so it must not be in Apple Home.</p>
     <div class="row">
       <input id="pin" inputmode="numeric" autocomplete="off" placeholder="123-45-678"
-             style="font:600 17px ui-monospace,Menlo,monospace;letter-spacing:2px;background:var(--panel2);color:var(--text);border:1px solid #37455a;border-radius:9px;padding:8px 12px;width:170px">
+             style="font:600 17px ui-monospace,Menlo,monospace;letter-spacing:2px;background:var(--panel2);color:var(--text);border:1px solid var(--axis);border-radius:9px;padding:8px 12px;width:170px">
       <button class="primary" id="btn-pair">Pair</button>
       <span class="muted" id="pair-result"></span>
     </div>
   </div>
 
+  <div class="card">
+    <h2>Phone alerts</h2>
+    <p class="sub" id="phone-sub"></p>
+    <div id="phone-setup" class="hidden">
+      <ol class="muted" style="padding-left:20px;margin:6px 0">
+        <li>Install the free <b>ntfy</b> app on your phone.</li>
+        <li>Subscribe to this topic. Keep it private: anyone who has it can read your alerts.</li>
+      </ol>
+      <code class="topic" id="phone-topic"></code>
+    </div>
+    <div class="row"><button class="primary" id="phone-toggle"></button><button class="ghost hidden" id="phone-test">Send a test</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Gas meter</h2>
+    <p class="sub" id="meter-sub"></p>
+    <div class="row" style="flex-wrap:nowrap;align-items:flex-end"><label class="field" style="flex:1;margin:0">Reading now (m³)<input id="meter-input" type="number" inputmode="decimal" min="0" step="0.001"></label><button class="primary" id="meter-save" style="padding:11px 16px">Save</button></div>
+    <div id="meter-list" style="margin-top:8px"></div>
+  </div>
+  <h2 class="page">Rooms</h2>
   <div class="row" style="margin:0 0 12px;justify-content:space-between">
     <p class="muted hidden" id="summary" style="margin:0"></p>
     <span class="row"><span class="muted" id="health-txt"></span><button class="ghost" id="btn-health">Check devices</button>
@@ -139,19 +532,43 @@
   <div class="grid" id="zones"></div>
   <p class="muted hidden" id="empty">No zones yet — waiting for the bridge…</p>
 </main>
+
+<dialog id="quick-sheet" class="sheet" aria-label="Quick actions"><button class="handle" aria-label="Close"></button><div id="quick-body"></div></dialog>
+<dialog id="dial-sheet" class="sheet" aria-labelledby="dial-title"><button class="handle" aria-label="Close"></button><div id="dial-body"></div></dialog>
+<dialog id="room-sheet" class="sheet" aria-labelledby="room-sheet-title"><button class="handle" aria-label="Close"></button><div id="room-body"></div></dialog>
+
+<dialog id="away-sheet" class="sheet" aria-labelledby="away-sheet-title">
+  <button class="handle" aria-label="Close"></button>
+  <h2 id="away-sheet-title">Set the house to away</h2>
+  <p class="muted" style="margin:0">Every room holds one temperature, ignoring schedules and night off. Rooms go back to normal when away mode ends.</p>
+  <label>When are you back?</label>
+  <div class="presets" id="away-presets"></div>
+  <input type="datetime-local" id="away-until" aria-label="Return date and time" style="margin-top:8px">
+  <label for="away-temp">Keep every room at</label>
+  <select id="away-temp"></select>
+  <p class="muted" style="margin:6px 0 0">A low temperature keeps pipes safe and limits damp.</p>
+  <div class="sheet-actions">
+    <button class="ghost" id="away-cancel">Cancel</button>
+    <button class="primary" id="away-confirm">Set to away</button>
+  </div>
+</dialog>
+
 <div id="toast"></div>
+<div id="tip"></div>
 
 <script>
 const $ = id => document.getElementById(id);
 let status = null;
 let activateTimer = null;
 let refreshTimer = null;
+let historyTimer = null;
 
 // Behind an authenticating proxy (basic auth) the browser caches the login. Signing out =
 // overwrite that cache with credentials the proxy rejects; the next visit asks again.
 if (!["127.0.0.1", "localhost"].includes(location.hostname)) $("btn-signout").classList.remove("hidden");
 $("btn-signout").onclick = () => {
   clearInterval(refreshTimer);
+  clearInterval(historyTimer);
   const xhr = new XMLHttpRequest();
   xhr.open("GET", "api/status", true, "signed-out", "x");  // XHR credentials replace the cached ones
   xhr.onloadend = () => {
@@ -161,12 +578,17 @@ $("btn-signout").onclick = () => {
   xhr.send();
 };
 
-function toast(msg, isErr) {
+function toast(msg, isErr, undo) {
   const t = $("toast");
   t.textContent = msg;
-  t.className = "show" + (isErr ? " err" : "");
+  t.className = "show" + (isErr ? " err" : "") + (undo ? " undo" : "");
+  if (undo) {
+    const b = el("button", "", "Undo");
+    b.onclick = () => { t.className = ""; undo(); };
+    t.appendChild(b);
+  }
   clearTimeout(t._h);
-  t._h = setTimeout(() => t.className = "", 3200);
+  t._h = setTimeout(() => t.className = "", undo ? 6000 : 3200);
 }
 
 async function api(path, opts) {
@@ -184,6 +606,41 @@ function fmtTemp(v) {
   if (v == null) return "—";
   return (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, "");
 }
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const avg = xs => { const v = xs.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const fmt = (t, o) => new Date(t * 1000).toLocaleString("en-GB", o);
+const hhmm = iso => iso ? new Date(iso).toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"}) : "";
+const hours = h => h == null ? "—" : h < 10 ? (Math.round(h * 10) / 10) + " h" : Math.round(h) + " h";
+
+// ---- navigation --------------------------------------------------------------
+const VIEWS = ["dashboard", "charts", "costs", "settings"];
+const HASHES = {dashboard: "#/", charts: "#/charts", costs: "#/costs", settings: "#/settings"};
+function route() {
+  const [, page, target] = location.hash.split("/");
+  const settings = page === "settings", costs = page === "costs", charts = page === "charts";
+  const view = settings ? "settings" : costs ? "costs" : charts ? "charts" : "dashboard";
+  for (const v of VIEWS) {
+    $("view-" + v).classList.toggle("hidden", v !== view);
+    $("nav-" + v).classList.toggle("on", v === view);
+    $("nav-" + v).toggleAttribute("aria-current", v === view);
+  }
+  window.scrollTo(0, 0);
+  hideTip();
+  refresh().then(() => {
+    if (settings && target) {
+      const card = $("room-" + target);
+      if (card) { card.scrollIntoView({behavior: "smooth", block: "start"}); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1500); }
+    }
+    if (view === "dashboard") loadAir();
+    if (charts) { renderFigures(); renderCharts(); }
+    if (costs) loadCosts();
+    if (settings) { loadPhone(); loadCosts(); }
+  });
+}
+window.addEventListener("hashchange", route);
+const onDashboard = () => !$("view-dashboard").classList.contains("hidden");
+const onCharts = () => !$("view-charts").classList.contains("hidden");
+const onCosts = () => !$("view-costs").classList.contains("hidden");
 
 // ---- header / setup rendering ------------------------------------------------
 function renderStatus(s) {
@@ -211,6 +668,9 @@ function renderStatus(s) {
     " Current bridge firmware no longer serves the local REST API — pair over HomeKit below instead.";
   $("pair-card").classList.toggle("hidden", !!hk.paired);
   $("empty").classList.toggle("hidden", !(b.ok && s.zones === 0));
+  const down = !hk.paired || !b.ok;
+  $("bridge-notice").classList.toggle("hidden", !down);
+  if (down) $("bridge-notice").textContent = (hk.paired ? "Bridge not responding: schedules, night off and history are paused until it's back." : "Bridge not paired yet.") + " Open Settings →";
 }
 
 // ---- device flow ---------------------------------------------------------------
@@ -270,18 +730,1312 @@ async function setPresence(mode) {
   } catch (e) { toast(e.message, true); }
 }
 
-// ---- zones ------------------------------------------------------------------------
+
+// ---- data ---------------------------------------------------------------------
+let zonesNow = [];
+let roomsMeta = [];   // from api/rooms: [{id, name, devices, schedule, quiet, mode, until, next}]
+let awayNow = {active: false, celsius: 12};
+let dialNow = 0;
+
 async function refresh() {
   try {
     const [r, rm] = await Promise.all([api("api/zones"), api("api/rooms")]);
     renderStatus(r.status);
+    zonesNow = r.zones;
     roomsMeta = rm.rooms;
+    awayNow = rm.away;
+    dialNow = rm.dial;
+    issuesNow = rm.alerts;
+    renderBadge();
+    renderAway();
+    if (onDashboard()) { renderHome(); return; }
+    if (onCharts()) { renderFigures(); return; }
+    if (onCosts()) return;
     const active = document.activeElement;
     if (editing && active && active.closest && active.closest("#zones") && active.tagName !== "BUTTON") return;
     renderZones(r.zones);
   } catch (e) { toast(e.message, true); }
 }
 
+// Series colours follow the room, not its position in a filtered list. Slots validated
+// against the card surface with the dataviz palette checker; a 9th room onward is gray.
+const SERIES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+function roomColor(id) {
+  const ids = roomsMeta.map(r => r.id).sort((a, b) => a - b);
+  const i = ids.indexOf(id);
+  return i >= 0 && i < SERIES.length ? SERIES[i] : "#8fa1b3";
+}
+const keyDot = color => { const d = el("span", "dot"); d.style.background = color; return d; };
+
+function roomLive(room) {
+  const devs = zonesNow.filter(z => z.room_id === room.id);
+  const st = devs.map(d => d.state);
+  return {
+    devs,
+    temp: avg(st.map(s => s.sensorDataPoints.insideTemperature.celsius)),
+    hum: avg(st.map(s => s.sensorDataPoints.humidity.percentage)),
+    target: avg(st.map(s => s.setting.temperature.celsius)),
+    off: st.length > 0 && st.every(s => s.setting.power === "OFF"),
+    heating: st.some(s => s.activityDataPoints.heatingPower.percentage > 0),
+  };
+}
+
+// ---- home: issues -------------------------------------------------------------------
+let issuesNow = [], hiddenIssues = new Map();  // key -> since: swiped away until a new occurrence
+const visibleIssues = () => issuesNow.filter(a => hiddenIssues.get(a.key) !== a.since);
+
+function renderBadge() {
+  const n = issuesNow.length, b = $("issue-badge");
+  b.classList.toggle("hidden", !n);
+  b.textContent = n;
+  $("nav-dashboard").setAttribute("aria-label", n ? `Home, ${n} issue${n > 1 ? "s" : ""}` : "Home");
+}
+
+function renderIssues() {
+  const box = $("issues"), list = visibleIssues();
+  const sig = JSON.stringify(list);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  box.innerHTML = "";
+  for (const a of list) {
+    const wrap = el("div", "swipe"), card = el("div", "issue " + a.kind), det = el("details"), sum = el("summary"), more = el("div", "more");
+    const under = el("div", "under", "Hide");
+    sum.append(el("span", "ic", a.kind === "window" ? "🪟" : "⚠"), el("span", "tt", a.title));
+    sum.onclick = e => { if (card.dataset.dragged) e.preventDefault(); };
+    more.appendChild(document.createTextNode(`${a.message} Since ${fmt(a.since, {hour: "2-digit", minute: "2-digit"})}.`));
+    const acts = el("div", "acts");
+    const room = roomsMeta.find(r => r.id === a.room_id);
+    if (a.kind === "window" && room) {
+      const pause = el("button", "", "Heating off 30 min");
+      pause.onclick = () => holdRoom(room, null, 0.5, `${room.name}: heating off for 30 minutes`);
+      acts.appendChild(pause);
+    }
+    if (room) { const open = el("button", "", "Room"); open.onclick = () => openRoom(room.id); acts.appendChild(open); }
+    const hide = el("button", "", "Hide");
+    hide.onclick = () => hideIssue(a);
+    acts.appendChild(hide);
+    more.appendChild(acts);
+    det.append(sum, more);
+    card.appendChild(det);
+    wrap.append(under, card);
+    attachSwipe(wrap, card, {right: () => hideIssue(a), left: () => hideIssue(a)});
+    box.appendChild(wrap);
+  }
+}
+
+function hideIssue(a) {
+  hiddenIssues.set(a.key, a.since);
+  renderIssues();
+  toast("Hidden. It stays counted until it's fixed.", false, () => { hiddenIssues.delete(a.key); renderIssues(); });
+}
+
+// ---- gestures --------------------------------------------------------------------------
+function attachSwipe(wrap, card, {right, left, onUnder}) {
+  let x0 = 0, y0 = 0, dx = 0, id = null, horizontal = null;
+  const unders = wrap.querySelectorAll(".under");
+  const set = x => {
+    card.style.transform = x ? `translateX(${x}px)` : "";
+    unders.forEach(u => {
+      const forRight = u.classList.contains("warm") || unders.length === 1;
+      u.style.opacity = (x > 0 && forRight) || (x < 0 && (u.classList.contains("cool") || unders.length === 1)) ? 1 : 0;
+    });
+    if (onUnder) onUnder(x);
+  };
+  wrap.addEventListener("pointerdown", e => {
+    if (e.button || e.target.closest("button:not(.tile), .more")) return;
+    x0 = e.clientX; y0 = e.clientY; dx = 0; id = e.pointerId; horizontal = null;
+  });
+  wrap.addEventListener("pointermove", e => {
+    if (e.pointerId !== id) return;
+    const mx = e.clientX - x0, my = e.clientY - y0;
+    if (horizontal === null && Math.hypot(mx, my) > 8) {
+      horizontal = Math.abs(mx) > Math.abs(my);
+      if (horizontal) { wrap.setPointerCapture(id); wrap.classList.add("dragging"); swiping = true; }
+      else id = null;
+    }
+    if (horizontal) { dx = mx; set(Math.abs(dx) > 120 ? Math.sign(dx) * (120 + (Math.abs(dx) - 120) * .35) : dx); }
+  });
+  const end = e => {
+    if (e.pointerId !== id) return;
+    id = null;
+    if (!horizontal) return;
+    wrap.classList.remove("dragging");
+    swiping = false;
+    card.dataset.dragged = "1";
+    setTimeout(() => delete card.dataset.dragged, 60);
+    const done = Math.abs(dx) >= Math.max(44, Math.min(110, wrap.clientWidth * .33));
+    set(0);
+    if (done && navigator.vibrate) navigator.vibrate(12);
+    if (done) (dx > 0 ? right : left)();
+  };
+  wrap.addEventListener("pointerup", end);
+  wrap.addEventListener("pointercancel", e => { dx = 0; end(e); });
+}
+let swiping = false;
+
+// Swiping across the page changes tab. Not from the screen edge (the browser's back gesture),
+// nor from anything that has its own sideways gesture.
+(() => {
+  let start = null;
+  document.addEventListener("touchstart", e => {
+    const t = e.touches[0];
+    const own = e.target.closest(".chart, .filters, .scroll, .air-strip, .swipe, input, select, dialog, nav");
+    start = e.touches.length > 1 || own || t.clientX < 24 || t.clientX > innerWidth - 24 ? null : {x: t.clientX, y: t.clientY, at: Date.now()};
+  }, {passive: true});
+  document.addEventListener("touchend", e => {
+    if (!start) return;
+    const t = e.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y;
+    const quick = Date.now() - start.at < 600;
+    start = null;
+    if (!quick || Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .5) return;
+    const now = VIEWS.findIndex(v => !$("view-" + v).classList.contains("hidden"));
+    const to = VIEWS[now + (dx < 0 ? 1 : -1)];
+    if (!to) return;
+    const view = $("view-" + to);
+    view.classList.remove("view-in-l", "view-in-r");
+    void view.offsetWidth;
+    view.classList.add(dx < 0 ? "view-in-l" : "view-in-r");
+    location.hash = HASHES[to];
+  }, {passive: true});
+})();
+
+// Bottom sheets: drag the handle down, or tap outside, to close.
+document.querySelectorAll("dialog.sheet").forEach(d => {
+  const h = d.querySelector(".handle");
+  let y0 = null, dy = 0;
+  h.onclick = () => { if (!dy) d.close(); };
+  h.addEventListener("pointerdown", e => { y0 = e.clientY; dy = 0; h.setPointerCapture(e.pointerId); });
+  h.addEventListener("pointermove", e => { if (y0 != null) { dy = Math.max(0, e.clientY - y0); d.style.transform = dy ? `translateY(${dy}px)` : ""; } });
+  const up = () => {
+    if (y0 == null) return;
+    y0 = null;
+    d.style.transform = "";
+    if (dy > 70) d.close();
+    setTimeout(() => dy = 0, 30);
+  };
+  h.addEventListener("pointerup", up);
+  h.addEventListener("pointercancel", up);
+  d.addEventListener("click", e => { if (e.target === d) d.close(); });
+});
+
+// ---- room actions ---------------------------------------------------------------------
+const warmTo = room => room.on_demand ? room.on_demand.effective : Math.max(5, Math.min(25, 21 + dialNow));
+const OFF_ALL_DAY = 24;  // night off cuts it short, and the morning schedule takes over
+
+function holdRoom(room, celsius, hrs, msg) {
+  return api(`api/rooms/${room.id}/hold`, {body: {celsius, hours: hrs}})
+    .then(() => {
+      toast(msg, false, () => api(`api/rooms/${room.id}/resume`, {}).then(refresh).catch(e => toast(e.message, true)));
+      return refresh();
+    }).catch(e => { toast(`${room.name}: ${e.message}`, true); refresh(); });
+}
+const warmRoom = room => holdRoom(room, warmTo(room), 1, `${room.name}: warming to ${fmtTemp(warmTo(room))}° for an hour`);
+const offRoom = room => holdRoom(room, null, OFF_ALL_DAY, `${room.name}: off until tomorrow's schedule`);
+
+const hoursLeft = room => Math.max(0, (new Date(room.until) - Date.now()) / 3600000);
+
+function backToSchedule(rooms) {
+  return Promise.all(rooms.map(r => api(`api/rooms/${r.id}/resume`, {})))
+    .then(() => { toast(rooms.length === 1 ? `${rooms[0].name}: back to its schedule` : "All rooms back to their schedules"); refresh(); })
+    .catch(e => toast(e.message, true));
+}
+
+function openRoom(id) {
+  const room = roomsMeta.find(r => r.id === id);
+  if (!room) return;
+  const live = roomLive(room), body = $("room-body");
+  body.innerHTML = "";
+  const title = el("h2", "", room.name);
+  title.id = "room-sheet-title";
+  body.appendChild(title);
+  const now = el("div", "room-now"), cur = el("div", "cur", fmtTemp(live.temp));
+  cur.appendChild(el("small", "", "°C"));
+  now.append(cur, el("div", "muted", (live.off ? "Heating off" : live.heating ? `Heating to ${fmtTemp(live.target)}°` : `Idle, target ${fmtTemp(live.target)}°`) + (live.hum != null ? ` · ${Math.round(live.hum)}% humidity` : "")));
+  body.appendChild(now);
+  body.appendChild(el("div", "muted", modeText(room)));
+  const back = el("button", room.held ? "primary wide" : "ghost wide", room.held ? "Back to schedule" : "Back to schedule (already on it)");
+  back.onclick = () => { $("room-sheet").close(); backToSchedule([room]); };
+  body.appendChild(back);
+  body.insertAdjacentHTML("beforeend", sparkline(room));
+  for (const a of issuesNow.filter(x => x.room_id === id)) {
+    const n = el("div", "notice alert-item");
+    n.style.margin = "10px 0 0";
+    n.append(el("b", "", a.title), document.createTextNode(a.message));
+    body.appendChild(n);
+  }
+  let want = live.target != null ? Math.round(live.target * 2) / 2 : warmTo(room);
+  const stepper = el("div", "stepper");
+  stepper.style.cssText = "justify-content:space-between;margin:12px 0 0";
+  const minus = el("button", "", "−"), plus = el("button", "", "+"), tgt = el("span", "target");
+  minus.setAttribute("aria-label", "Lower target"); plus.setAttribute("aria-label", "Raise target");
+  const draw = () => tgt.textContent = fmtTemp(want) + "°";
+  draw();
+  let timer = null;
+  const send = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => Promise.all(live.devs.map(d => api(`api/zones/${d.id}/set`, {body: {celsius: want}})))
+      .then(() => { toast(`${room.name} → ${fmtTemp(want)}° until its next change`); refresh(); }).catch(e => toast(e.message, true)), 700);
+  };
+  minus.onclick = () => { want = Math.max(5, want - .5); draw(); send(); };
+  plus.onclick = () => { want = Math.min(25, want + .5); draw(); send(); };
+  stepper.append(minus, tgt, plus);
+  body.appendChild(stepper);
+  const grid = el("div", "action-grid");
+  const action = (label, sub, fn) => { const b = el("button"); b.append(el("span", "", label), el("small", "", sub)); b.onclick = () => { $("room-sheet").close(); fn(); }; grid.appendChild(b); };
+  action("Warm now", `${fmtTemp(warmTo(room))}° for 1 hour`, () => warmRoom(room));
+  action("Off", "until tomorrow's schedule", () => offRoom(room));
+  if (room.held) action("+1 hour", `Keep this until ${hhmm(new Date(new Date(room.until).getTime() + 3600000).toISOString())}`, () => {
+    (room.on_demand ? api(`api/rooms/${room.id}/boost`, {body: {extend_hours: 1}}) : holdRoom(room, live.off ? null : want, hoursLeft(room) + 1, `${room.name}: one more hour`))
+      .then(() => { if (room.on_demand) { toast("One more hour"); refresh(); } }).catch(e => toast(e.message, true));
+  });
+  action("See its chart", "temperature and heating", () => { roomFilter = room.id; location.hash = "#/charts"; });
+  action("Edit schedule", "times, night off", () => {
+    if (!editing) $("btn-edit").click();
+    location.hash = "#/settings/" + room.id;
+  });
+  body.appendChild(grid);
+  $("room-sheet").showModal();
+}
+
+// ---- quick actions (the middle button) ------------------------------------------------
+const heldRooms = () => roomsMeta.filter(r => r.held);
+
+function openQuick() {
+  const body = $("quick-body");
+  body.innerHTML = "";
+  body.appendChild(el("h2", "", "Quick actions"));
+  const grid = el("div", "action-grid");
+  const action = (label, sub, fn, on) => { const b = el("button", on ? "on" : ""); b.append(el("span", "", label), el("small", "", sub)); b.onclick = () => { $("quick-sheet").close(); fn(); }; grid.appendChild(b); };
+  for (const r of roomsMeta.filter(x => x.on_demand)) {
+    action(`Using ${r.name}`, r.held ? `On until ${hhmm(r.until)}. Tap to stop` : `${fmtTemp(r.on_demand.effective)}° for ${r.on_demand.hours} h`,
+      () => (r.held ? api(`api/rooms/${r.id}/resume`, {}) : api(`api/rooms/${r.id}/boost`, {body: {}})).then(() => { toast(r.held ? `${r.name}: back to its schedule` : `${r.name}: warming up`); refresh(); }).catch(e => toast(e.message, true)), r.held);
+  }
+  action("Back to schedule", heldRooms().length ? `${heldRooms().length} room${heldRooms().length > 1 ? "s" : ""} overridden` : "All rooms already on it", () => backToSchedule(roomsMeta.filter(r => r.devices.length)), heldRooms().length > 0);
+  action("All rooms off", "until tomorrow's schedule", () => {
+    if (!confirm("Turn off heating in every room until tomorrow's schedule?")) return;
+    Promise.all(roomsMeta.filter(r => r.devices.length).map(r => api(`api/rooms/${r.id}/hold`, {body: {celsius: null, hours: OFF_ALL_DAY}})))
+      .then(() => { toast("All rooms off"); refresh(); }).catch(e => { toast(e.message, true); refresh(); });
+  });
+  action("House dial", fmtDial(dialNow) + (dialNow ? " on every room" : ", as scheduled"), openDial, dialNow !== 0);
+  action("Gas meter", "Save a reading", () => { location.hash = "#/settings"; setTimeout(() => { $("meter-input").scrollIntoView({block: "center"}); $("meter-input").focus(); }, 300); });
+  body.appendChild(grid);
+  body.appendChild(el("p", "sheet-title", "Warm a room for an hour"));
+  const rooms = el("div", "presets");
+  for (const r of roomsMeta.filter(x => x.devices.length)) {
+    const b = el("button");
+    b.append(keyDot(roomColor(r.id)), document.createTextNode(" " + r.name));
+    b.onclick = () => { $("quick-sheet").close(); warmRoom(r); };
+    rooms.appendChild(b);
+  }
+  body.appendChild(rooms);
+  $("quick-sheet").showModal();
+}
+$("fab").onclick = openQuick;
+
+// ---- home ---------------------------------------------------------------------------------
+function renderHome() {
+  renderHead();
+  renderIssues();
+  renderTiles();
+  renderManual();
+}
+
+function renderHead() {
+  const live = roomsMeta.map(r => roomLive(r)).filter(r => r.temp != null);
+  const head = $("home-head");
+  head.innerHTML = "";
+  const big = el("div", "big", fmtTemp(avg(live.map(r => r.temp))));
+  big.appendChild(el("small", "", "° inside"));
+  head.appendChild(big);
+  const nowHour = air && air.hours[0];
+  const bit = (b, rest) => { const s = el("span"); s.append(el("b", "", b), document.createTextNode(rest)); head.appendChild(s); };
+  if (nowHour) bit(Math.round(nowHour.temp) + "°", " outside");
+  bit(`${live.filter(r => r.heating && !r.off).length} of ${live.length}`, " heating");
+  if (awayNow.active) bit("Away", awayNow.until ? " until " + new Date(awayNow.until).toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short"}) : "");
+  bit(issuesNow.length ? `${issuesNow.length} issue${issuesNow.length > 1 ? "s" : ""}` : "No issues", "");
+}
+
+// ---- home: fresh air --------------------------------------------------------------------
+let air = null, airSel = null;
+async function loadAir() {
+  try {
+    air = await api("api/air");
+    if (onDashboard()) { renderAir(); renderHead(); }
+  } catch (e) { /* the card keeps its last state */ }
+}
+const clock = t => fmt(t, {hour: "2-digit", minute: "2-digit"});
+
+function renderAir() {
+  if (!air) return;
+  const best = air.best, nowT = air.now, hrs = air.hours;
+  const sameDay = t => new Date(t * 1000).toDateString() === new Date().toDateString();
+  $("air-card").classList.toggle("hidden", !hrs.length);
+  if (!hrs.length) return;
+  const here = hrs[0];
+  const isNow = here.hour <= nowT && nowT < here.hour + 3600;
+  let verdict, sub = [];
+  if (best && best.start <= nowT && nowT < best.end) {
+    verdict = `Good time to open windows, until ${clock(best.end)}`;
+    sub.push(`Open fully for ${best.minutes} minutes, across the house if you can.`);
+  } else if (best) {
+    verdict = `Best time: ${sameDay(best.start) ? "" : "tomorrow "}${clock(best.start)}–${clock(best.end)}`;
+    sub.push(`About ${Math.round(best.temp)}° outside${best.aqi != null ? `, air quality ${best.aqi}` : ""}. Open fully for ${best.minutes} minutes.`);
+    if (isNow && here.reason) sub.unshift(`Not now: ${here.reason}.`);
+  } else {
+    verdict = "No good time to air soon";
+    if (isNow && here.reason) sub.push(`Mostly ${here.reason}.`);
+  }
+  if (air.humid_rooms.length) sub.push(air.humid_rooms.map(r => `${r.room} is at ${r.humidity}% humidity`).join(", ") + ": it would gain the most.");
+  $("air-verdict").textContent = verdict;
+  $("air-sub").textContent = sub.join(" ");
+
+  const strip = $("air-strip");
+  const keep = strip.scrollLeft;
+  strip.innerHTML = "";
+  const temps = hrs.map(h => h.temp), lo = Math.min(...temps), hi = Math.max(...temps);
+  if (airSel == null || !hrs.some(h => h.hour === airSel)) airSel = (hrs.find(h => h.rating === "best") || here).hour;
+  const read = h => {
+    const box = $("air-read");
+    box.innerHTML = "";
+    box.append(el("b", "", clock(h.hour)), document.createTextNode(` · ${Math.round(h.temp)}° · ${Math.round(h.humidity)}% humidity${h.aqi != null ? ` · air quality ${Math.round(h.aqi)}` : ""} · ${h.rating === "avoid" ? "Avoid: " + h.reason : h.rating === "best" ? `Best, ${h.minutes} min` : `Fine, ${h.minutes} min`}`));
+  };
+  let lastDay = null;
+  for (const h of hrs) {
+    const d = new Date(h.hour * 1000).toDateString();
+    const label = d === lastDay ? null : d === new Date().toDateString() ? "Today" : fmt(h.hour, {weekday: "long"});
+    lastDay = d;
+    const b = el("button", `air-cell ${h.rating}${h.hour === airSel ? " sel" : ""}`);
+    b.setAttribute("aria-pressed", h.hour === airSel ? "true" : "false");
+    b.setAttribute("aria-label", `${clock(h.hour)}, ${h.rating === "avoid" ? "avoid, " + h.reason : h.rating}, ${Math.round(h.temp)} degrees`);
+    if (label) b.appendChild(el("span", "daylabel", label));
+    const col = el("span", "col"), bar = el("span", "bar", (h.rating === "avoid" ? "×" : h.rating === "best" ? "★" : "") || Math.round(h.temp) + "°");
+    bar.style.height = 16 + ((h.temp - lo) / Math.max(hi - lo, 1)) * 24 + "px";
+    col.appendChild(bar);
+    b.append(col, el("span", "", String(new Date(h.hour * 1000).getHours()).padStart(2, "0")));
+    b.onclick = () => { airSel = h.hour; renderAir(); };
+    strip.appendChild(b);
+  }
+  strip.scrollLeft = keep;
+  read(hrs.find(h => h.hour === airSel));
+  legend($("air-legend"), [{color: "#0ca30c", box: true, label: "★ Best"}, {color: "#3b4a5c", box: true, label: "Fine"}, {color: "#232c36", box: true, label: "× Avoid"}]);
+  const ev = $("air-events");
+  ev.classList.toggle("hidden", !air.events.length);
+  ev.innerHTML = "";
+  if (air.events.length) {
+    ev.appendChild(el("div", "", "Looks like a window was opened today:"));
+    for (const e of air.events) {
+      const row = el("div");
+      row.append(el("b", "", e.room), document.createTextNode(` ${clock(e.start)}${e.end ? "–" + clock(e.end) : ", still open?"}, down ${e.drop}°${e.heating ? ", while heating" : ""}`));
+      ev.appendChild(row);
+    }
+  }
+  twin($("twin-air"), () => ({
+    head: ["Hour", "Rating", "Outside", "Humidity", "Air quality", "Rain"],
+    rows: hrs.map(h => [fmt(h.hour, {weekday: "short", hour: "2-digit", minute: "2-digit"}), h.rating === "avoid" ? "Avoid: " + h.reason : h.rating === "best" ? "Best" : "Fine", Math.round(h.temp) + "°", Math.round(h.humidity) + "%", h.aqi == null ? "—" : String(Math.round(h.aqi)), h.rain + " mm"]),
+  }));
+}
+
+function renderManual() {
+  const box = $("manual-rows");
+  const held = heldRooms();
+  const sig = JSON.stringify(held.map(r => [r.id, r.until]));
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  box.innerHTML = "";
+  if (!held.length) return;
+  const row = el("div", "manual-row");
+  row.appendChild(el("span", "", held.map(r => `${r.name} until ${hhmm(r.until)}`).join(", ")));
+  const b = el("button", "", "Back to schedule");
+  b.onclick = () => backToSchedule(held);
+  row.appendChild(b);
+  box.appendChild(row);
+}
+
+// ---- settings: phone alerts ---------------------------------------------------------
+let phone = null;
+async function loadPhone() {
+  try { phone = await api("api/alerts/phone"); renderPhone(); } catch (e) { toast(e.message, true); }
+}
+function renderPhone() {
+  $("phone-setup").classList.toggle("hidden", !phone.enabled);
+  $("phone-test").classList.toggle("hidden", !phone.enabled);
+  $("phone-toggle").textContent = phone.enabled ? "Turn off" : "Turn on";
+  $("phone-toggle").className = phone.enabled ? "ghost" : "primary";
+  $("phone-topic").textContent = phone.topic || "";
+  $("phone-sub").textContent = phone.enabled
+    ? "On. You get a notification when a valve or the bridge has been failing for 5 minutes, and again when it's fixed."
+    : "Off. Problems still show on the dashboard. Turning this on sends the room name and problem through the public ntfy.sh service.";
+}
+$("phone-toggle").onclick = async () => {
+  try { phone = await api("api/alerts/phone", {method: "PUT", body: {enabled: !phone.enabled}}); renderPhone(); } catch (e) { toast(e.message, true); }
+};
+$("phone-test").onclick = () => api("api/alerts/test", {}).then(() => toast("Test sent: check your phone")).catch(e => toast(e.message, true));
+
+// ---- dashboard: away ------------------------------------------------------------
+const awayTemp = c => c == null ? "heating off" : "at " + fmtTemp(c) + "°C";
+
+function nightSummary() {
+  const groups = new Map();
+  for (const r of roomsMeta) {
+    const k = r.quiet ? r.quiet.start + "–" + r.quiet.end : "none";
+    groups.set(k, [...(groups.get(k) || []), r.name]);
+  }
+  if (groups.size === 1) {
+    const [k] = groups.keys();
+    return k === "none" ? "No night off set" : "Night off " + k + " in every room";
+  }
+  const parts = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  return "Night off " + parts.map(([k, names], i) => (i === 0 ? k : (k === "none" ? "none" : k) + " in " + names.join(", "))).join(" · ");
+}
+
+function renderAway() {
+  const a = awayNow;
+  $("away-card").classList.toggle("on", a.active);
+  $("away-switch").setAttribute("aria-checked", a.active ? "true" : "false");
+  $("away-title").textContent = a.active ? "Away" : "Home";
+  $("away-sub").textContent = a.active
+    ? "All rooms " + awayTemp(a.celsius) + (a.until ? " until " + new Date(a.until).toLocaleString("en-GB", {weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}) : " until you turn this off")
+    : nightSummary();
+}
+
+const PRESETS = [["Until I turn it off", 0], ["Tomorrow", 1], ["2 days", 2], ["3 days", 3], ["1 week", 7]];
+function localInput(d) {
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function pickPreset(days) {
+  [...$("away-presets").children].forEach((b, i) => b.classList.toggle("sel", PRESETS[i][1] === days));
+  if (!days) { $("away-until").value = ""; return; }
+  const d = new Date(Date.now() + days * 86400000);
+  d.setMinutes(0, 0, 0);
+  $("away-until").value = localInput(d);
+}
+PRESETS.forEach(([label, days]) => {
+  const b = el("button", "", label);
+  b.onclick = () => pickPreset(days);
+  $("away-presets").appendChild(b);
+});
+$("away-until").oninput = () => [...$("away-presets").children].forEach((b, i) => b.classList.toggle("sel", !$("away-until").value && i === 0));
+$("away-temp").innerHTML = '<option value="">Off</option>' + [5, 8, 10, 12, 14, 15, 16, 17, 18].map(t => `<option value="${t}">${t} °C</option>`).join("");
+$("away-switch").onclick = async () => {
+  if (!awayNow.active) {
+    pickPreset(0);
+    $("away-temp").value = awayNow.celsius == null ? "" : String(awayNow.celsius);
+    $("away-sheet").showModal();
+    return;
+  }
+  try {
+    await api("api/house/away", {body: {active: false}});
+    toast("Welcome back: rooms return to their schedules");
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+};
+$("away-cancel").onclick = () => $("away-sheet").close();
+$("away-confirm").onclick = async () => {
+  const celsius = $("away-temp").value === "" ? null : Number($("away-temp").value);
+  try {
+    await api("api/house/away", {body: {active: true, until: $("away-until").value || null, celsius}});
+    $("away-sheet").close();
+    toast("House set to away: " + awayTemp(celsius));
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+};
+
+// ---- dashboard: figures + tiles ------------------------------------------------------
+function renderFigures() {
+  const live = roomsMeta.map(r => ({room: r, ...roomLive(r)})).filter(r => r.temp != null);
+  const box = $("figures");
+  box.innerHTML = "";
+  const hero = el("div", "hero");
+  const num = el("div", "num", fmtTemp(avg(live.map(r => r.temp))));
+  num.appendChild(el("small", "", "°C"));
+  hero.append(num, el("div", "label", "House average now"));
+  box.appendChild(hero);
+  const stat = (label, val, delta) => {
+    const s = el("div", "stat");
+    s.append(el("div", "label", label), el("div", "val", val));
+    if (delta) s.appendChild(el("div", "delta", delta));
+    box.appendChild(s);
+  };
+  const today = hist24 && hist24.today;
+  let delta = "";
+  if (today && today.yesterday_heat_hours != null) {
+    const diff = today.heat_hours - today.yesterday_heat_hours;
+    delta = (diff > 0 ? "+" : "") + (Math.round(diff * 10) / 10) + " h vs yesterday";
+  }
+  stat("Heat today", today ? hours(today.heat_hours) : "—", delta || "all rooms");
+  const heating = live.filter(r => r.heating).length;
+  stat("Heat now", `${heating} of ${live.length}`, heating ? live.filter(r => r.heating).map(r => r.room.name).join(", ") : "none");
+  const sorted = [...live].sort((a, b) => a.temp - b.temp);
+  stat("Coldest", sorted.length ? fmtTemp(sorted[0].temp) + "°" : "—", sorted.length ? sorted[0].room.name : "");
+  stat("Humidity", live.length ? Math.round(avg(live.map(r => r.hum))) + "%" : "—", "average");
+}
+
+function sparkline(room) {
+  const h = hist24 && hist24.rooms.find(r => r.id === room.id);
+  const pts = h ? h.points : [];
+  const svg = `<svg class="spark" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true"></svg>`;
+  if (pts.length < 2) return svg;
+  const ts = pts.map(p => p[1]);
+  const lo = Math.min(...ts), hi = Math.max(...ts), span = Math.max(hi - lo, 0.5);
+  const x0 = hist24.from, x1 = hist24.to;
+  const path = pts.map((p, i) => {
+    const gap = i && p[0] - pts[i - 1][0] > hist24.bucket * 2.5;
+    return (i === 0 || gap ? "M" : "L") + (((p[0] - x0) / (x1 - x0)) * 100).toFixed(2) + " " + (31 - ((p[1] - lo) / span) * 28).toFixed(2);
+  }).join("");
+  return `<svg class="spark" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="${roomColor(room.id)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+function modeText(room) {
+  if (room.mode === "night") return "Night off until " + hhmm(room.until);
+  if (room.mode === "away") return room.until ? "Away until " + new Date(room.until).toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short"}) : "Away";
+  if (room.mode === "manual") return "Manual until " + hhmm(room.until);
+  return room.next ? "Next: " + room.next : "No schedule";
+}
+
+const fmtDial = v => v === 0 ? "0°" : (v > 0 ? "+" : "−") + fmtTemp(Math.abs(v)) + "°";
+
+function dialBlock() {
+  const b = el("button", "tile dial-block" + (dialNow > 0 ? " up" : dialNow < 0 ? " down" : ""));
+  b.append(el("span", "name", "House dial"), el("div", "now", fmtDial(dialNow)), el("div", "line", dialNow > 0 ? "warmer" : dialNow < 0 ? "cooler" : "normal"));
+  b.setAttribute("aria-label", `House dial, ${fmtDial(dialNow)}. Open`);
+  b.onclick = openDial;
+  return b;
+}
+
+function openDial() {
+  const DIAL_MAX = 3, SWEEP = 135, R = 92, CX = 120, CY = 120;
+  const body = $("dial-body");
+  body.innerHTML = "";
+  const title = el("h2", "", "House dial");
+  title.id = "dial-title";
+  const note = el("p", "muted");
+  note.style.margin = "2px 0 6px";
+  body.append(title, note);
+  const polar = deg => [CX + R * Math.sin(deg * Math.PI / 180), CY - R * Math.cos(deg * Math.PI / 180)];
+  const arc = (a, b) => { const [x0, y0] = polar(a), [x1, y1] = polar(b); return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${R} ${R} 0 ${Math.abs(b - a) > 180 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
+  let ticks = "";
+  for (let v = -DIAL_MAX; v <= DIAL_MAX; v++) {
+    const [x, y] = polar(v / DIAL_MAX * SWEEP);
+    const lx = CX + (x - CX) * 1.2, ly = CY + (y - CY) * 1.2;
+    ticks += `<text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" text-anchor="middle" class="dial-unit">${v > 0 ? "+" + v : v < 0 ? "−" + -v : "0"}</text>`;
+  }
+  const wrap = el("div", "dial-wrap");
+  wrap.innerHTML = `<svg class="dial-svg" viewBox="0 0 240 216" role="slider" tabindex="0" aria-label="House dial, degrees warmer or cooler than the schedules" aria-valuemin="${-DIAL_MAX}" aria-valuemax="${DIAL_MAX}">
+    <path d="${arc(-SWEEP, SWEEP)}" fill="none" stroke="var(--chip)" stroke-width="14" stroke-linecap="round"/>
+    <path class="fill" fill="none" stroke-width="14" stroke-linecap="round"/>
+    ${ticks}
+    <circle class="knob" r="13" fill="var(--text)" stroke="var(--panel)" stroke-width="3"/>
+    <text class="dial-value" x="${CX}" y="${CY + 8}" text-anchor="middle"></text>
+    <text class="dial-unit" x="${CX}" y="${CY + 28}" text-anchor="middle">every room</text>
+  </svg>`;
+  const svg = wrap.firstElementChild, fill = svg.querySelector(".fill"), knob = svg.querySelector(".knob"), label = svg.querySelector(".dial-value");
+  const row = el("div", "dial-row");
+  const minus = el("button", "", "−"), reset = el("button", "reset ghost", "Back to 0"), plus = el("button", "", "+");
+  minus.setAttribute("aria-label", "Half a degree cooler");
+  plus.setAttribute("aria-label", "Half a degree warmer");
+  row.append(minus, reset, plus);
+  wrap.appendChild(row);
+  body.appendChild(wrap);
+  let value = dialNow, timer = null;
+  const draw = () => {
+    const deg = value / DIAL_MAX * SWEEP, [x, y] = polar(deg);
+    knob.setAttribute("cx", x); knob.setAttribute("cy", y);
+    fill.setAttribute("d", value ? (value > 0 ? arc(0, deg) : arc(deg, 0)) : "");
+    fill.setAttribute("stroke", value > 0 ? "var(--accent)" : "var(--away)");
+    label.textContent = fmtDial(value);
+    svg.setAttribute("aria-valuenow", value);
+    svg.setAttribute("aria-valuetext", value === 0 ? "as scheduled" : `${fmtTemp(Math.abs(value))} degrees ${value > 0 ? "warmer" : "cooler"}`);
+    note.textContent = value === 0 ? "Every room runs as scheduled. Night off and away mode don't change."
+      : `Every schedule runs ${fmtTemp(Math.abs(value))}° ${value > 0 ? "warmer" : "cooler"}. Night off and away mode don't change.`;
+    reset.disabled = value === 0;
+  };
+  const set = v => {
+    v = Math.max(-DIAL_MAX, Math.min(DIAL_MAX, Math.round(v * 2) / 2));
+    if (v === value) return;
+    value = v;
+    if (navigator.vibrate) navigator.vibrate(6);
+    draw();
+    clearTimeout(timer);
+    timer = setTimeout(() => api("api/house/dial", {method: "PUT", body: {offset: value}})
+      .then(() => { toast(value === 0 ? "House dial back to normal" : `House dial: ${fmtDial(value)}`); refresh(); })
+      .catch(e => toast(e.message, true)), 500);
+  };
+  const fromPointer = e => {
+    const r = svg.getBoundingClientRect(), k = 240 / r.width;
+    const deg = Math.atan2((e.clientX - r.left) * k - CX, CY - (e.clientY - r.top) * k) * 180 / Math.PI;
+    if (Math.abs(deg) <= SWEEP) set(deg / SWEEP * DIAL_MAX);  // the gap at the bottom does nothing, so it can't jump across
+  };
+  let dragging = false;
+  svg.addEventListener("pointerdown", e => { dragging = true; svg.setPointerCapture(e.pointerId); fromPointer(e); });
+  svg.addEventListener("pointermove", e => { if (dragging) fromPointer(e); });
+  svg.addEventListener("pointerup", () => dragging = false);
+  svg.addEventListener("pointercancel", () => dragging = false);
+  svg.addEventListener("keydown", e => {
+    const step = {ArrowUp: .5, ArrowRight: .5, ArrowDown: -.5, ArrowLeft: -.5}[e.key];
+    if (!step) return;
+    e.preventDefault();
+    set(value + step);
+  });
+  minus.onclick = () => set(value - .5);
+  plus.onclick = () => set(value + .5);
+  reset.onclick = () => set(0);
+  draw();
+  $("dial-sheet").showModal();
+}
+
+function onDemandBlock(r) {
+  const c = r.on_demand;
+  const b = el("button", "tile od" + (r.held ? " on" : ""));
+  const stopping = r.mode === "night" && !r.held;
+  b.append(el("span", "name", `Using ${r.name}`), el("div", "now", r.held ? "On" : fmtTemp(c.effective) + "°"), el("div", "line", r.held ? "to " + hhmm(r.until) : stopping ? "1 h max" : c.hours + " h"));
+  b.setAttribute("role", "switch");
+  b.setAttribute("aria-checked", r.held ? "true" : "false");
+  b.setAttribute("aria-label", `Using ${r.name}: ${r.held ? "on until " + hhmm(r.until) : `warms to ${fmtTemp(c.effective)} degrees`}`);
+  b.onclick = () => r.held
+    ? backToSchedule([r])
+    : api(`api/rooms/${r.id}/boost`, {body: {}}).then(() => { toast(`${r.name}: warming to ${fmtTemp(c.effective)}°`, false, () => backToSchedule([r])); refresh(); }).catch(e => toast(e.message, true));
+  return b;
+}
+
+function renderTiles() {
+  if (swiping) return;  // don't pull a room out from under a finger
+  const box = $("tiles");
+  const rooms = roomsMeta.map(room => ({room, live: roomLive(room)})).filter(x => x.live.devs.length);
+  const sig = JSON.stringify([dialNow, rooms.map(({room, live}) => [room.id, room.name, room.mode, room.until, room.on_demand, live.temp, live.target, live.off, live.heating]), issuesNow.map(a => a.key)]);
+  if (box.dataset.sig === sig) return;  // redrawing every refresh would lose keyboard focus
+  box.dataset.sig = sig;
+  box.innerHTML = "";
+  box.appendChild(dialBlock());
+  for (const {room} of rooms) if (room.on_demand) box.appendChild(onDemandBlock(room));
+  for (const {room, live} of rooms) {
+    const wrap = el("div", "swipe");
+    const warm = el("div", "under warm", "Warm"), cool = el("div", "under cool", "Off");
+    const flagged = issuesNow.filter(a => a.room_id === room.id);
+    const on = live.heating && !live.off;
+    const b = el("button", "tile" + (on ? " is-heating" : "") + (room.held ? " held" : "") + (flagged.length ? " has-issue" : ""));
+    const name = el("span", "name");
+    name.append(keyDot(roomColor(room.id)), document.createTextNode(room.name));
+    const now = el("div", "now", fmtTemp(live.temp));
+    now.appendChild(el("small", "", "°"));
+    const line = flagged.length ? (flagged[0].kind === "window" ? "🪟 window?" : "⚠ check")
+      : room.held ? "↺ " + hhmm(room.until)
+      : room.mode === "night" || live.off ? "Off"
+      : (on ? "▲ " : "→ ") + fmtTemp(live.target) + "°";
+    b.append(name, now, el("div", "line", line));
+    b.setAttribute("aria-label", `${room.name}, ${fmtTemp(live.temp)} degrees, ${live.off ? "off" : on ? "heating to " + fmtTemp(live.target) : "idle, target " + fmtTemp(live.target)}${room.held ? ", overridden" : ""}${flagged.length ? ", " + flagged[0].title : ""}. Open room`);
+    b.onclick = () => { if (!b.dataset.dragged) openRoom(room.id); };
+    wrap.append(warm, cool, b);
+    attachSwipe(wrap, b, {right: () => warmRoom(room), left: () => offRoom(room)});
+    box.appendChild(wrap);
+  }
+}
+
+// ---- dashboard: history ---------------------------------------------------------------
+let hist = null, hist24 = null;
+let range = "24h", roomFilter = null;
+const RANGE_LABELS = {"24h": "24 h", "7d": "7 days", "30d": "30 days", "90d": "90 days", "1y": "1 year"};
+try { range = localStorage.getItem("range") || range; } catch (e) { /* storage blocked: default */ }
+if (!RANGE_LABELS[range]) range = "24h";
+
+async function loadHistory() {
+  $("charts").classList.add("loading");
+  try {
+    const [a, b] = await Promise.all([api("api/history?range=" + range), range === "24h" ? null : api("api/history?range=24h")]);
+    hist = a;
+    hist24 = b || a;
+    if (onDashboard()) renderTiles();
+    if (onCharts()) { renderFigures(); renderCharts(); }
+  } catch (e) { toast(e.message, true); }
+  $("charts").classList.remove("loading");
+}
+
+function selectRoom(id) {
+  roomFilter = id;
+  renderCharts();
+}
+
+function renderFilters() {
+  const box = $("filters");
+  box.innerHTML = "";
+  for (const [k, label] of Object.entries(RANGE_LABELS)) {
+    const b = el("button", k === range ? "sel" : "", label);
+    b.setAttribute("aria-pressed", k === range ? "true" : "false");
+    b.onclick = () => { range = k; try { localStorage.setItem("range", k); } catch (e) { /* not essential */ } renderFilters(); loadHistory(); };
+    box.appendChild(b);
+  }
+  box.appendChild(el("span", "sep"));
+  const all = el("button", roomFilter == null ? "sel" : "", "All rooms");
+  all.onclick = () => selectRoom(null);
+  box.appendChild(all);
+  for (const r of roomsMeta) {
+    const b = el("button", roomFilter === r.id ? "sel" : "");
+    b.append(keyDot(roomColor(r.id)), document.createTextNode(r.name));
+    b.onclick = () => selectRoom(r.id);
+    box.appendChild(b);
+  }
+}
+
+const shownRooms = () => hist.rooms.filter(r => roomFilter == null || r.id === roomFilter);
+
+// ---- tooltip -----------------------------------------------------------------------
+const tip = $("tip");
+function hideTip() { tip.style.display = "none"; }
+function showTip(x, y, title, rows) {
+  tip.innerHTML = "";
+  tip.appendChild(el("div", "t", title));
+  for (const r of rows) {
+    const row = el("div", "r");
+    const key = el("span", r.box ? "key-box" : "key-line");
+    key.style.background = r.color;
+    row.append(key, el("b", "", r.value), el("span", "", r.label));
+    tip.appendChild(row);
+  }
+  tip.style.display = "block";
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 14 + w > innerWidth ? x - w - 14 : x + 14)) + "px";
+  tip.style.top = Math.max(8, Math.min(innerHeight - h - 8, y - h - 12)) + "px";
+}
+document.addEventListener("pointerdown", e => { if (!e.target.closest(".chart")) hideTip(); });
+
+// ---- charts -----------------------------------------------------------------------
+function timeTicks(from, to, width) {
+  const span = to - from, out = [];
+  const maxTicks = Math.max(3, Math.floor(width / 62));
+  const start = new Date(from * 1000);
+  if (span <= 2 * 86400) {
+    const every = [1, 2, 3, 6, 12].find(h => span / 3600 / h <= maxTicks) || 12;
+    start.setMinutes(0, 0, 0);
+    for (let d = start; d / 1000 <= to; d = new Date(+d + 3600000)) {
+      if (d / 1000 >= from && d.getHours() % every === 0) out.push([d / 1000, d.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})]);
+    }
+    return out;
+  }
+  if (span <= 120 * 86400) {
+    const days = span / 86400;
+    const every = [1, 2, 7, 14, 30].find(n => days / n <= maxTicks) || 30;
+    start.setHours(0, 0, 0, 0);
+    let i = 0;
+    for (let d = start; d / 1000 <= to; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      if (d / 1000 >= from && i++ % every === 0) out.push([d / 1000, days <= 8 ? d.toLocaleDateString("en-GB", {weekday: "short", day: "numeric"}) : d.toLocaleDateString("en-GB", {day: "numeric", month: "short"})]);
+    }
+    return out;
+  }
+  const every = [1, 2, 3].find(n => span / 86400 / 30 / n <= maxTicks) || 3;
+  for (let d = new Date(start.getFullYear(), start.getMonth() + 1, 1); d / 1000 <= to; d = new Date(d.getFullYear(), d.getMonth() + every, 1)) {
+    out.push([d / 1000, d.toLocaleDateString("en-GB", {month: "short"})]);
+  }
+  return out;
+}
+
+function niceTicks(lo, hi, count) {
+  const raw = Math.max(hi - lo, 1e-6) / count;
+  const step = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000].find(s => s >= raw) || 5000;
+  const out = [];
+  for (let v = Math.floor(lo / step) * step; v <= hi + step * 0.999; v += step) out.push(Math.round(v * 10) / 10);
+  return out;
+}
+
+function pointTitle(t) {
+  return fmt(t, hist.bucket >= 86400 ? {weekday: "short", day: "numeric", month: "short"} : {weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+}
+
+/* series: [{label, color, values: Map(t -> v), step?}]; strip: Map(t -> 0..1) heating band under the plot;
+   band: {color, values: Map(t -> [lo, hi])} range wash behind the lines */
+function lineChart(box, series, {unit, strip, band}) {
+  box.innerHTML = "";
+  const times = [...new Set(series.flatMap(s => [...s.values.keys()]))].sort((a, b) => a - b);
+  const anyValue = series.some(s => [...s.values.values()].some(v => v != null));
+  if (!anyValue) {
+    box.appendChild(el("div", "empty-chart", "Collecting data: the first readings appear within a few minutes."));
+    return;
+  }
+  const W = Math.max(box.clientWidth, 260), stripH = strip ? 14 : 0, H = W < 500 ? 190 : 240;
+  const m = {l: 30, r: 10, t: 8, b: 22 + stripH};
+  const from = Math.max(hist.from, Math.min(times[0], hist.to - 3600)), to = hist.to;
+  const vals = series.flatMap(s => [...s.values.values()]).filter(v => v != null);
+  if (band) vals.push(...[...band.values.values()].flat());
+  const ticks = niceTicks(Math.min(...vals), Math.max(...vals), W < 500 ? 4 : 5);
+  const lo = ticks[0], hi = ticks[ticks.length - 1];
+  const X = t => m.l + ((t - from) / Math.max(to - from, 1)) * (W - m.l - m.r);
+  const Y = v => H - m.b + (m.t - (H - m.b)) * ((v - lo) / Math.max(hi - lo, 1e-6));
+  const maxGap = hist.bucket * 2.5;
+
+  let g = "";
+  for (const v of ticks) g += `<line class="grid-line" x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l - 6}" y="${Y(v) + 3.5}" text-anchor="end">${v}</text>`;
+  for (const [t, label] of timeTicks(from, to, W)) g += `<text x="${X(t)}" y="${H - 6}" text-anchor="middle">${label}</text>`;
+  if (strip) {
+    const w = Math.max(1.5, X(from + hist.bucket) - X(from));
+    for (const [t, frac] of strip) if (frac > 0) g += `<rect x="${X(t)}" y="${H - m.b + 6}" width="${w}" height="6" fill="#ff7a45" opacity="${Math.max(0.2, frac)}"/>`;
+  }
+  if (band) {
+    const pts = [...band.values.entries()].filter(([t]) => t >= from).sort((a, b) => a[0] - b[0]);
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) g += `<path fill="${band.color}" opacity=".16" d="M${run.map(([t, r]) => X(t).toFixed(1) + " " + Y(r[1]).toFixed(1)).join("L")}L${[...run].reverse().map(([t, r]) => X(t).toFixed(1) + " " + Y(r[0]).toFixed(1)).join("L")}Z"/>`;
+      run = [];
+    };
+    for (const p of pts) { if (run.length && p[0] - run[run.length - 1][0] > maxGap) flush(); run.push(p); }
+    flush();
+  }
+  for (const s of series) {
+    let d = "", prev = null;
+    const pts = [...s.values.entries()].filter(([t]) => t >= from).sort((a, b) => a[0] - b[0]);
+    for (const [t, v] of pts) {
+      if (v == null) { prev = null; continue; }
+      if (prev == null || t - prev[0] > maxGap) d += `M${X(t).toFixed(1)} ${Y(v).toFixed(1)}`;
+      else if (s.step) d += `H${X(t).toFixed(1)}V${Y(v).toFixed(1)}`;
+      else d += `L${X(t).toFixed(1)} ${Y(v).toFixed(1)}`;
+      prev = [t, v];
+    }
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (!s.step && prev) g += `<circle cx="${X(prev[0])}" cy="${Y(prev[1])}" r="4" fill="${s.color}" stroke="#1a2129" stroke-width="2"/>`;
+  }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" tabindex="0" role="img" aria-label="Chart; use the left and right arrow keys to read values">${g}<line class="cross" stroke="#8fa1b3" stroke-width="1" y1="${m.t}" y2="${H - m.b}" visibility="hidden"/></svg>`;
+  const svg = box.firstChild, cross = svg.querySelector(".cross");
+  const shown = times.filter(t => t >= from);
+  let idx = shown.length - 1;
+  const read = (i, cx, cy) => {
+    idx = i;
+    const t = shown[i];
+    cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
+    const rows = series.map(s => ({color: s.color, label: s.label, value: s.values.get(t) == null ? (s.nullText || "—") : fmtTemp(s.values.get(t)) + unit}));
+    if (band && band.values.get(t)) rows.push({color: band.color, box: true, label: "lowest–highest", value: band.values.get(t).map(fmtTemp).join("–") + unit});
+    if (strip && strip.get(t) != null) rows.push({color: "#ff7a45", label: "time heating", value: Math.round(strip.get(t) * 100) + "%"});
+    showTip(cx, cy, pointTitle(t), rows);
+  };
+  const nearest = cx => {
+    const r = svg.getBoundingClientRect(), x = (cx - r.left) * (W / r.width);
+    let best = 0, dist = Infinity;
+    shown.forEach((t, i) => { const d = Math.abs(X(t) - x); if (d < dist) { dist = d; best = i; } });
+    return best;
+  };
+  svg.addEventListener("pointermove", e => read(nearest(e.clientX), e.clientX, e.clientY));
+  svg.addEventListener("pointerdown", e => { svg.classList.add("pointer"); read(nearest(e.clientX), e.clientX, e.clientY); });
+  svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") { hideTip(); cross.setAttribute("visibility", "hidden"); } });
+  svg.addEventListener("keydown", e => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const i = Math.max(0, Math.min(shown.length - 1, idx + (e.key === "ArrowRight" ? 1 : -1)));
+    const r = svg.getBoundingClientRect();
+    read(i, r.left + X(shown[i]) * (r.width / W), r.top + 40);
+  });
+  svg.addEventListener("blur", () => { hideTip(); cross.setAttribute("visibility", "hidden"); });
+}
+
+function legend(box, items) {
+  box.innerHTML = "";
+  for (const it of items) {
+    const s = el("span");
+    const k = el("span", it.box ? "key-box" : "key-line");
+    k.style.background = it.color;
+    s.append(k, document.createTextNode(it.label));
+    box.appendChild(s);
+  }
+}
+
+function twin(details, build) {
+  details.ontoggle = null;
+  const fill = () => {
+    details.querySelectorAll(".scroll").forEach(n => n.remove());
+    if (!details.open) return;
+    const {head, rows} = build();
+    const wrap = el("div", "scroll"), table = el("table"), tr = el("tr");
+    head.forEach(h => tr.appendChild(el("th", "", h)));
+    table.appendChild(tr);
+    rows.forEach(r => { const row = el("tr"); r.forEach(c => row.appendChild(el("td", "", c))); table.appendChild(row); });
+    wrap.appendChild(table);
+    details.appendChild(wrap);
+  };
+  details.ontoggle = fill;
+  fill();
+}
+
+function metricCharts() {
+  const rooms = shownRooms();
+  const one = roomFilter != null && rooms.length === 1 ? rooms[0] : null;
+  const toMap = (r, i) => new Map(r.points.map(p => [p[0], p[i]]));
+  const temp = rooms.map(r => ({label: r.name, color: roomColor(r.id), values: toMap(r, 1)}));
+  let strip = null, band = null;
+  const daily = hist.bucket >= 86400;
+  if (one) {
+    strip = toMap(one, 4);
+    if (daily) band = {color: roomColor(one.id), values: new Map(one.points.map(p => [p[0], [p[5], p[6]]]))};
+    else temp.push({label: "Target", color: "#8fa1b3", values: toMap(one, 2), step: true, nullText: "off"});
+  }
+  $("temp-title").textContent = one ? "Temperature: " + one.name : "Temperature";
+  $("temp-sub").textContent = one
+    ? (daily ? "Daily average with the day's lowest and highest reading, and how much of the day it called for heat." : "Average of the room's devices, its target (gaps = heating off), and when it called for heat.")
+    : (daily ? "Daily average of each room. Pick a room to see its daily range." : "Average of each room's devices. Pick a room to see its target and heating.");
+  const items = temp.map(s => ({color: s.color, label: s.label}));
+  if (band) items.push({color: band.color, label: "Lowest–highest", box: true});
+  if (one) items.push({color: "#ff7a45", label: "Calling for heat", box: true});
+  legend($("temp-legend"), items);
+  lineChart($("chart-temp"), temp, {unit: "°", strip, band});
+
+  const hum = rooms.filter(r => r.points.some(p => p[3] != null)).map(r => ({label: r.name, color: roomColor(r.id), values: toMap(r, 3)}));
+  legend($("hum-legend"), hum.length > 1 ? hum.map(s => ({color: s.color, label: s.label})) : []);
+  lineChart($("chart-hum"), hum, {unit: "%"});
+
+  const tableOf = (series, unit) => () => {
+    const times = [...new Set(series.flatMap(s => [...s.values.keys()]))].sort((a, b) => b - a);
+    return {
+      head: ["Time", ...series.map(s => s.label)],
+      rows: times.map(t => [pointTitle(t), ...series.map(s => s.values.get(t) == null ? "—" : fmtTemp(s.values.get(t)) + unit)]),
+    };
+  };
+  twin($("twin-temp"), tableOf(temp, "°"));
+  twin($("twin-hum"), tableOf(hum, "%"));
+}
+
+function barLabel(t, by, long) {
+  if (by === "hour") return fmt(t, {hour: "2-digit", minute: "2-digit"});
+  if (by === "month") return fmt(t, long ? {month: "long", year: "numeric"} : {month: "short"});
+  if (by === "week") return (long ? "Week of " : "") + fmt(t, {day: "numeric", month: "short"});
+  return fmt(t, long ? {weekday: "short", day: "numeric", month: "short"} : {day: "numeric", month: "short"});
+}
+
+function barsChart() {
+  const box = $("chart-bars");
+  const rooms = shownRooms();
+  const {by, rows} = hist.bars;
+  const per = {hour: "per hour", day: "per day", week: "per week", month: "per month"}[by];
+  $("bars-sub").textContent = `Hours each room spent calling for heat, ${per}.`;
+  legend($("bars-legend"), rooms.length > 1 ? rooms.map(r => ({color: roomColor(r.id), label: r.name, box: true})) : []);
+  box.innerHTML = "";
+  const totals = rows.map(row => rooms.reduce((a, r) => a + (row.rooms[r.id] || 0), 0));
+  if (!rows.length) {
+    box.appendChild(el("div", "empty-chart", "Collecting data: heating time appears within a few minutes."));
+    twin($("twin-bars"), () => ({head: ["Period"], rows: []}));
+    return;
+  }
+  const W = Math.max(box.clientWidth, 260), H = W < 500 ? 170 : 210, m = {l: 30, r: 6, t: 8, b: 22};
+  const ticks = niceTicks(0, Math.max(...totals, 0.5), 4);
+  const top = ticks[ticks.length - 1];
+  const Y = v => H - m.b - (v / top) * (H - m.b - m.t);
+  const band = (W - m.l - m.r) / Math.max(rows.length, by === "hour" ? 24 : 7);
+  const bw = Math.max(3, Math.min(24, band - 2));
+  const every = Math.ceil(rows.length / Math.max(3, Math.floor(W / 62)));
+  let g = "";
+  for (const v of ticks) g += `<line class="grid-line" x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l - 6}" y="${Y(v) + 3.5}" text-anchor="end">${v}</text>`;
+  rows.forEach((row, i) => {
+    const x = m.l + i * band + (band - bw) / 2;
+    let base = H - m.b;
+    const parts = rooms.filter(r => (row.rooms[r.id] || 0) > 0);
+    parts.forEach((r, j) => {
+      const h = (row.rooms[r.id] / top) * (H - m.b - m.t);
+      const topY = base - h;
+      const seg = Math.max(h - (j < parts.length - 1 ? 2 : 0), 1);
+      const y = j < parts.length - 1 ? topY + 2 : topY;
+      const rad = j === parts.length - 1 ? Math.min(4, bw / 2, seg) : 0;
+      g += `<path fill="${roomColor(r.id)}" d="M${x} ${y + seg}V${y + rad}Q${x} ${y} ${x + rad} ${y}H${x + bw - rad}Q${x + bw} ${y} ${x + bw} ${y + rad}V${y + seg}Z"/>`;
+      base = topY;
+    });
+    if (i % every === 0) g += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${barLabel(row.t, by)}</text>`;
+    g += `<rect class="hit" data-i="${i}" x="${m.l + i * band}" y="${m.t}" width="${band}" height="${H - m.b - m.t}" fill="transparent"/>`;
+  });
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Heating hours; the same values are in the table below">${g}</svg>`;
+  const tipFor = e => {
+    const hit = e.target.closest(".hit");
+    if (!hit) return hideTip();
+    const row = rows[+hit.dataset.i];
+    const items = rooms.filter(r => row.rooms[r.id]).map(r => ({color: roomColor(r.id), label: r.name, value: hours(row.rooms[r.id]), box: true}));
+    showTip(e.clientX, e.clientY, barLabel(row.t, by, true), items.length ? items : [{color: "#37455a", label: "no heating", value: "0 h", box: true}]);
+  };
+  box.firstChild.addEventListener("pointermove", tipFor);
+  box.firstChild.addEventListener("pointerdown", tipFor);
+  box.firstChild.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hideTip(); });
+  twin($("twin-bars"), () => ({
+    head: ["Period", ...rooms.map(r => r.name)],
+    rows: [...rows].reverse().map(row => [barLabel(row.t, by, true), ...rooms.map(r => hours(row.rooms[r.id] || 0))]),
+  }));
+}
+
+const HEAT_BINS = [[5, "#3b2c28"], [15, "#6b3a22"], [30, "#a24a1f"], [45, "#d9602a"], [61, "#ff8f5c"]];
+const heatColor = v => v == null ? "#1f2830" : v === 0 ? "#2b3644" : HEAT_BINS.find(b => v < b[0])[1];
+const WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function heatmap() {
+  const box = $("chart-heat");
+  const rooms = shownRooms();
+  const grids = rooms.map(r => hist.heatmap[r.id]).filter(Boolean);
+  const scope = range === "24h" ? "the last 7 days" : "this period";
+  $("heat-sub").textContent = `Average minutes per hour spent calling for heat, by weekday and time, over ${scope}${rooms.length > 1 ? ", averaged across rooms" : ""}.`;
+  box.innerHTML = "";
+  const cell = (d, h) => avg(grids.map(g => g[d][h]));
+  if (!grids.length) {
+    box.appendChild(el("div", "empty-chart", "Collecting data: this fills in as the week goes on."));
+    $("heat-scale").innerHTML = "";
+    twin($("twin-heat"), () => ({head: ["Day"], rows: []}));
+    return;
+  }
+  const W = Math.max(box.clientWidth, 260), l = 32, cw = (W - l) / 24, ch = 20, H = ch * 7 + 20;
+  let g = "";
+  for (let d = 0; d < 7; d++) {
+    g += `<text x="${l - 6}" y="${d * ch + 14}" text-anchor="end">${WEEK[d]}</text>`;
+    for (let h = 0; h < 24; h++) g += `<rect class="hit" data-d="${d}" data-h="${h}" x="${l + h * cw + 1}" y="${d * ch + 1}" width="${Math.max(cw - 2, 1)}" height="${ch - 2}" rx="2" fill="${heatColor(cell(d, h))}"/>`;
+  }
+  for (const h of [0, 6, 12, 18]) g += `<text x="${l + h * cw}" y="${H - 4}">${String(h).padStart(2, "0")}:00</text>`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Heating by weekday and hour; the same values are in the table below">${g}</svg>`;
+  const scale = $("heat-scale");
+  scale.innerHTML = "";
+  scale.appendChild(el("span", "", "0"));
+  ["#2b3644", ...HEAT_BINS.map(b => b[1])].forEach(c => { const i = el("i"); i.style.background = c; scale.appendChild(i); });
+  scale.appendChild(el("span", "", "60 min"));
+  const noData = el("i"); noData.style.background = "#1f2830"; noData.style.marginLeft = "10px";
+  scale.append(noData, el("span", "", "no data"));
+  const tipFor = e => {
+    const c = e.target.closest(".hit");
+    if (!c) return hideTip();
+    const v = cell(+c.dataset.d, +c.dataset.h);
+    showTip(e.clientX, e.clientY, `${WEEK[+c.dataset.d]} ${c.dataset.h.padStart(2, "0")}:00`, [{color: heatColor(v), box: true, label: "calling for heat", value: v == null ? "no data" : Math.round(v) + " min"}]);
+  };
+  box.firstChild.addEventListener("pointermove", tipFor);
+  box.firstChild.addEventListener("pointerdown", tipFor);
+  box.firstChild.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hideTip(); });
+  twin($("twin-heat"), () => ({
+    head: ["Day", ...Array.from({length: 24}, (_, h) => String(h).padStart(2, "0"))],
+    rows: WEEK.map((d, i) => [d, ...Array.from({length: 24}, (_, h) => { const v = cell(i, h); return v == null ? "—" : String(Math.round(v)); })]),
+  }));
+}
+
+function roomTable() {
+  const table = $("room-table");
+  table.innerHTML = "";
+  const head = el("tr");
+  ["Room", "Avg", "Min", "Max", "Humidity", "Heating"].forEach(h => head.appendChild(el("th", "", h)));
+  table.appendChild(head);
+  for (const r of shownRooms()) {
+    const tr = el("tr"), first = el("td"), key = el("span", "room-key");
+    key.append(keyDot(roomColor(r.id)), el("span", "", r.name));
+    first.appendChild(key);
+    tr.appendChild(first);
+    const s = r.stats;
+    [s && fmtTemp(s.avg) + "°", s && fmtTemp(s.min) + "°", s && fmtTemp(s.max) + "°", s && s.humidity != null ? Math.round(s.humidity) + "%" : null, s && hours(s.heat_hours)]
+      .forEach(v => tr.appendChild(el("td", "", v || "—")));
+    table.appendChild(tr);
+  }
+  $("table-sub").textContent = "Over the last " + RANGE_LABELS[range] + ".";
+}
+
+function renderCharts() {
+  renderFilters();
+  if (!hist || !onCharts()) return;
+  metricCharts();
+  barsChart();
+  heatmap();
+  roomTable();
+  const since = hist.collecting_since;
+  $("foot").textContent = since
+    ? `History since ${fmt(since, {day: "numeric", month: "short", year: "numeric"})} · ${(hist.db_bytes / 1048576).toFixed(1)} MB · one reading a minute`
+    : "History starts recording now, one reading a minute.";
+}
+
+let resizeTimer = null, lastWidth = innerWidth;
+window.addEventListener("resize", () => {
+  if (innerWidth === lastWidth) return;  // mobile browser bars hiding: same width, no redraw
+  lastWidth = innerWidth;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { renderCharts(); if (onCosts()) renderCosts(); if (onDashboard()) renderTiles(); }, 150);
+});
+
+// ---- costs --------------------------------------------------------------------------
+let costs = null;
+const eur = v => v == null ? "—" : "€" + Math.round(v).toLocaleString("en-GB");
+const eur2 = v => v == null ? "—" : "€" + v.toFixed(2);
+const roughly = v => v < 100 ? v : Math.round(v / 10) * 10;  // the range isn't known to the euro
+const dayOf = (iso, o) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", o);
+
+async function loadCosts() {
+  try {
+    costs = await api("api/costs");
+    if (onCosts()) renderCosts();
+    else renderMeter(costs);
+  } catch (e) { toast(e.message, true); }
+}
+
+function fillCostForm(s) {
+  const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#view-costs input");
+  if (typing) return;
+  $("set-price").value = s.price;
+  $("set-budget").value = s.budget ?? "";
+  $("set-kw").value = s.kw_per_valve;
+  $("set-eff").value = Math.round(s.efficiency * 100);
+  $("set-other").value = s.nonheating_smc_day;
+}
+
+const COST_LEVEL = {
+  rough: ["Rough", d => `Based on only ${d < 2 ? Math.round(d * 24) + " hours" : Math.round(d) + " days"} of recordings and an assumed gas use per valve. Expect this to move. Save a gas meter reading in Settings now and another in a week to replace the assumption.`],
+  estimate: ["Estimate", () => "Based on your recorded heating, with an assumed gas use per valve. Two gas meter readings a week apart, saved in Settings, replace the assumption."],
+  measured: ["Measured gas", () => "Gas use per valve comes from your meter readings. The range is mostly how cold the rest of winter turns out."],
+};
+
+function renderCosts() {
+  if (!costs) return;
+  const c = costs;
+  fillCostForm(c.settings);
+  renderMeter(c);
+  $("cost-wait").classList.toggle("hidden", c.ready);
+  $("cost-body").classList.toggle("hidden", !c.ready);
+  if (!c.ready) { $("cost-reason").textContent = c.reason || "Not enough data yet."; return; }
+  const [level, why] = COST_LEVEL[c.confidence.level];
+  const seasonLabel = `${dayOf(c.season.start, {day: "numeric", month: "short"})} – ${dayOf(c.season.end, {day: "numeric", month: "short"})}`;
+  $("cost-badge").textContent = level;
+  $("cost-total").textContent = eur(c.forecast.eur);
+  $("cost-range").textContent = `Likely ${eur(roughly(c.forecast.low))}–${eur(roughly(c.forecast.high))} · ${seasonLabel} · about ${Math.round(c.forecast.smc)} Smc`;
+  $("cost-why").textContent = why(c.confidence.observed_days) + (c.spent.estimated_eur > 0 ? " Days before recording began are estimated from the weather." : "");
+
+  const stats = $("cost-stats");
+  stats.innerHTML = "";
+  const stat = (label, val, delta) => {
+    const s = el("div", "stat");
+    s.append(el("div", "label", label), el("div", "val", val), el("div", "delta", delta));
+    stats.appendChild(s);
+  };
+  stat("Today", eur2(c.today_eur), "recorded");
+  stat("So far", eur(c.spent.eur), c.spent.estimated_eur > 0 ? `${eur(c.spent.estimated_eur)} estimated` : "recorded");
+  stat("To come", eur(c.forecast.remaining_eur), "if unchanged");
+  if (c.budget) {
+    const gap = c.budget.forecast_gap_eur;
+    stat("Budget " + eur(c.budget.eur), (gap > 0 ? "▲ " : "▼ ") + eur(Math.abs(gap)), `${gap > 0 ? "over" : "under"}, aim ${eur(c.budget.aim_today_eur)} now`);
+  } else stat("Valve-hour", eur2(c.model.smc_per_valve_hour * c.settings.price), c.confidence.measured ? "measured" : "assumed");
+
+  costChart(c);
+  const outlook = $("cost-outlook");
+  outlook.innerHTML = "";
+  for (const d of c.outdoor) {
+    const cell = el("div", "", dayOf(d.d, {weekday: "short"}));
+    cell.appendChild(el("b", "", Math.round(d.temp) + "°"));
+    outlook.appendChild(cell);
+  }
+
+  const days = c.confidence.observed_days;
+  $("cost-rooms-sub").textContent = `Season forecast split by valve-hours recorded so far${days < 7 ? ". With under a week recorded, weekends aren't reflected yet" : ""}. Radiators are counted as equal.`;
+  const rooms = $("cost-rooms");
+  rooms.innerHTML = "";
+  const top = Math.max(...c.rooms.map(r => r.season_eur), 1);
+  const known = new Set(c.rooms.map(r => r.id));
+  for (const r of [...c.rooms, ...roomsMeta.filter(m => !known.has(m.id)).map(m => ({id: m.id, name: m.name, season_eur: 0, valve_hours: 0, share: 0}))]) {
+    const row = el("div", "room-cost"), nm = el("div", "nm");
+    nm.append(keyDot(roomColor(r.id)), el("span", "", r.name));
+    const track = el("div", "track"), fill = el("i");
+    fill.style.width = (r.season_eur / top * 100) + "%";
+    fill.style.background = roomColor(r.id);
+    track.appendChild(fill);
+    row.append(nm, el("b", "", eur(r.season_eur)), track, el("small", "", `${Math.round(r.share * 100)}% · ${hours(r.valve_hours)} of valve time`));
+    rooms.appendChild(row);
+  }
+
+  const months = $("cost-months");
+  months.innerHTML = "";
+  const head = el("tr");
+  ["Month", "Forecast", "Recorded", "Degree days"].forEach(h => head.appendChild(el("th", "", h)));
+  months.appendChild(head);
+  for (const m of c.months) {
+    const tr = el("tr");
+    [dayOf(m.month + "-15", {month: "long"}), eur(m.eur), m.recorded_eur ? eur(m.recorded_eur) : "—", String(m.degree_days)].forEach(v => tr.appendChild(el("td", "", v)));
+    months.appendChild(tr);
+  }
+}
+
+function costChart(c) {
+  const box = $("chart-cost");
+  const pts = c.series, todayI = Math.max(0, pts.findIndex(p => p.d === c.today));
+  const hasAim = pts[0].aim != null;
+  const SPEND = "#3987e5", AIM = "#8fa1b3";
+  $("cost-chart-sub").textContent = hasAim
+    ? "Running total. The aim line spends your budget in step with how cold the season normally is."
+    : "Running total. Set a budget below to add an aim line that follows how cold the season normally is.";
+  const items = [{color: SPEND, label: "Spent, then forecast (dashed)"}, {color: SPEND, label: "Likely range", box: true}];
+  if (hasAim) items.push({color: AIM, label: "Aim"});
+  legend($("cost-legend"), items);
+  const W = Math.max(box.clientWidth, 260), H = W < 500 ? 210 : 260, m = {l: 40, r: 10, t: 8, b: 22};
+  const ticks = niceTicks(0, Math.max(...pts.map(p => Math.max(p.high, p.aim || 0))), 4);
+  const top = ticks[ticks.length - 1];
+  const X = i => m.l + (i / (pts.length - 1)) * (W - m.l - m.r);
+  const Y = v => H - m.b - (v / top) * (H - m.b - m.t);
+  const line = (key, from, to) => pts.slice(from, to + 1).map((p, i) => (i ? "L" : "M") + X(from + i).toFixed(1) + " " + Y(p[key]).toFixed(1)).join("");
+  let g = "";
+  for (const v of ticks) g += `<line class="grid-line" x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l - 6}" y="${Y(v) + 3.5}" text-anchor="end">€${v}</text>`;
+  pts.forEach((p, i) => { if (p.d.endsWith("-01")) g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">${dayOf(p.d, {month: "short"})}</text>`; });
+  g += `<path fill="${SPEND}" opacity=".16" d="M${pts.map((p, i) => X(i).toFixed(1) + " " + Y(p.high).toFixed(1)).join("L")}L${pts.map((p, i) => [i, p]).reverse().map(([i, p]) => X(i).toFixed(1) + " " + Y(p.low).toFixed(1)).join("L")}Z"/>`;
+  if (hasAim) g += `<path d="${line("aim", 0, pts.length - 1)}" fill="none" stroke="${AIM}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  g += `<path d="${line("eur", todayI, pts.length - 1)}" fill="none" stroke="${SPEND}" stroke-width="2" stroke-dasharray="5 5" stroke-linecap="round"/>`;
+  g += `<path d="${line("eur", 0, todayI)}" fill="none" stroke="${SPEND}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  g += `<circle cx="${X(todayI)}" cy="${Y(pts[todayI].eur)}" r="4" fill="${SPEND}" stroke="#1a2129" stroke-width="2"/>`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" tabindex="0" role="img" aria-label="Running heating cost for the season; use the left and right arrow keys to read values">${g}<line class="cross" stroke="#8fa1b3" stroke-width="1" y1="${m.t}" y2="${H - m.b}" visibility="hidden"/></svg>`;
+  const svg = box.firstChild, cross = svg.querySelector(".cross");
+  let idx = todayI;
+  const read = (i, cx, cy) => {
+    idx = i;
+    const p = pts[i];
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("visibility", "visible");
+    const rows = [{color: SPEND, label: i <= todayI ? "spent" : "forecast", value: eur(p.eur)}, {color: SPEND, box: true, label: "likely", value: `${eur(roughly(p.low))}–${eur(roughly(p.high))}`}];
+    if (hasAim) rows.push({color: AIM, label: "aim", value: eur(p.aim)});
+    showTip(cx, cy, dayOf(p.d, {weekday: "short", day: "numeric", month: "short"}), rows);
+  };
+  const nearest = cx => {
+    const r = svg.getBoundingClientRect(), x = (cx - r.left) * (W / r.width);
+    return Math.max(0, Math.min(pts.length - 1, Math.round((x - m.l) / (W - m.l - m.r) * (pts.length - 1))));
+  };
+  svg.addEventListener("pointermove", e => read(nearest(e.clientX), e.clientX, e.clientY));
+  svg.addEventListener("pointerdown", e => { svg.classList.add("pointer"); read(nearest(e.clientX), e.clientX, e.clientY); });
+  svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") { hideTip(); cross.setAttribute("visibility", "hidden"); } });
+  svg.addEventListener("keydown", e => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const i = Math.max(0, Math.min(pts.length - 1, idx + (e.key === "ArrowRight" ? 1 : -1)));
+    const r = svg.getBoundingClientRect();
+    read(i, r.left + X(i) * (r.width / W), r.top + 40);
+  });
+  svg.addEventListener("blur", () => { hideTip(); cross.setAttribute("visibility", "hidden"); });
+  twin($("twin-cost"), () => ({
+    head: ["Date", "Running total", "Likely low", "Likely high", ...(hasAim ? ["Aim"] : [])],
+    rows: pts.map(p => [dayOf(p.d, {day: "numeric", month: "short"}), eur(p.eur), eur(p.low), eur(p.high), ...(hasAim ? [eur(p.aim)] : [])]),
+  }));
+}
+
+function renderMeter(c) {
+  const n = c.meter.length;
+  $("meter-sub").textContent = c.confidence && c.confidence.measured
+    ? "Your readings are setting the gas use per valve. Keep adding one every week or two."
+    : n ? "Add another at least a week after your first, with some heating in between, and the assumption is replaced." : "The only real measure of gas here. Save a reading now and another in a week.";
+  const list = $("meter-list");
+  list.innerHTML = "";
+  for (const r of [...c.meter].reverse()) {
+    const row = el("div", "meter-row");
+    const del = el("button", "ghost", "Remove");
+    del.style.padding = "3px 9px";
+    del.onclick = () => api("api/costs/meter/" + r.ts, {method: "DELETE"}).then(loadCosts).catch(e => toast(e.message, true));
+    row.append(el("span", "", fmt(r.ts, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"})), el("b", "", r.smc.toLocaleString("en-GB") + " m³"), del);
+    list.appendChild(row);
+  }
+}
+
+$("meter-save").onclick = async () => {
+  const v = $("meter-input").value;
+  if (v === "") return;
+  try {
+    await api("api/costs/meter", {body: {smc: Number(v)}});
+    $("meter-input").value = "";
+    toast("Meter reading saved");
+    loadCosts();
+  } catch (e) { toast(e.message, true); }
+};
+$("set-save").onclick = async () => {
+  const num = id => Number($(id).value);
+  try {
+    await api("api/costs/settings", {method: "PUT", body: {
+      price: num("set-price"), kw_per_valve: num("set-kw"), efficiency: num("set-eff") / 100,
+      nonheating_smc_day: num("set-other"), budget: $("set-budget").value === "" ? null : num("set-budget"),
+    }});
+    document.activeElement && document.activeElement.blur();
+    toast("Saved");
+    loadCosts();
+  } catch (e) { toast(e.message, true); }
+};
+
+// ---- settings: device health -----------------------------------------------------
 let health = null;  // serial -> {online, battery, last_seen}, from "Check devices"
 
 $("btn-health").onclick = async () => {
@@ -311,8 +2065,8 @@ function deviceLabel(z) {
   return kind + " " + (z.serial || z.id);
 }
 
-// ---- local rooms + schedules (edit mode) ----------------------------------------------
-let roomsMeta = [];   // from api/rooms: [{id, name, devices, schedule, next}]
+
+// ---- settings: local rooms + schedules (edit mode) ----------------------------------
 let editing = false;
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -327,6 +2081,47 @@ $("btn-addroom").onclick = async () => {
   const name = prompt("Room name");
   if (name) { await api("api/rooms", {body: {name}}); refresh(); }
 };
+
+function nightEditor(room) {
+  const box = el("div", "sched");
+  box.appendChild(el("div", "muted", "Night off: heating stays off in this window, whatever the schedule says. Tapping a control at night overrides it for at most an hour."));
+  const row = el("div", "sched-row");
+  const check = el("label", "check");
+  const on = el("input"); on.type = "checkbox"; on.checked = !!room.quiet;
+  check.append(on, document.createTextNode("Night off"));
+  const start = el("input"); start.type = "time"; start.value = room.quiet ? room.quiet.start : "22:00";
+  const end = el("input"); end.type = "time"; end.value = room.quiet ? room.quiet.end : "08:00";
+  const sync = () => { start.disabled = end.disabled = !on.checked; };
+  on.onchange = sync; sync();
+  const save = el("button", "primary", "Save");
+  save.onclick = () => api(`api/rooms/${room.id}/quiet`, {method: "PUT", body: on.checked ? {start: start.value, end: end.value} : {start: null, end: null}})
+    .then(() => { toast(room.name + (on.checked ? `: night off ${start.value}–${end.value}` : ": no night off")); refresh(); }).catch(e => toast(e.message, true));
+  row.append(check, start, document.createTextNode("to"), end, save);
+  box.appendChild(row);
+  if (!room.schedule.length) box.appendChild(el("div", "muted", "This room has no schedule, so nothing turns it back on in the morning."));
+  return box;
+}
+
+function onDemandEditor(room) {
+  const box = el("div", "sched");
+  box.appendChild(el("div", "muted", "On demand: adds a switch to the dashboard for when you're using this room. It warms the room for a set time, then returns to the schedule."));
+  const row = el("div", "sched-row");
+  const check = el("label", "check");
+  const on = el("input"); on.type = "checkbox"; on.checked = !!room.on_demand;
+  check.append(on, document.createTextNode("On demand"));
+  const temp = el("input"); temp.type = "number"; temp.min = 5; temp.max = 25; temp.step = 0.5; temp.style.width = "70px";
+  temp.value = room.on_demand ? room.on_demand.celsius : 20;
+  temp.setAttribute("aria-label", "Temperature");
+  const hrs = el("input"); hrs.type = "number"; hrs.min = 0.5; hrs.max = 12; hrs.step = 0.5; hrs.style.width = "70px";
+  hrs.value = room.on_demand ? room.on_demand.hours : 3;
+  hrs.setAttribute("aria-label", "Hours");
+  const save = el("button", "primary", "Save");
+  save.onclick = () => api(`api/rooms/${room.id}/on-demand`, {method: "PUT", body: on.checked ? {celsius: Number(temp.value), hours: Number(hrs.value)} : undefined})
+    .then(() => { toast(room.name + (on.checked ? ": on demand saved" : ": no longer on demand")); refresh(); }).catch(e => toast(e.message, true));
+  row.append(check, temp, document.createTextNode("° for"), hrs, document.createTextNode("h"), save);
+  box.appendChild(row);
+  return box;
+}
 
 function scheduleEditor(room) {
   const box = document.createElement("div");
@@ -400,7 +2195,8 @@ function groupRooms(zones) {
   return out;
 }
 
-const avg = xs => { const v = xs.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+const MODE_LINE = {schedule: "schedule · next: ", night: "night off · next: ", away: "away mode · next: ", manual: "manual — held until: ", free: ""};
 
 function renderZones(zones) {
   const wrap = $("zones");
@@ -419,8 +2215,11 @@ function renderZones(zones) {
     if (!devs.length) {  // empty room (edit mode only)
       const card = document.createElement("div");
       card.className = "zone";
+      card.id = "room-" + room.id;
       card.innerHTML = '<h3></h3><p class="muted">No devices — move one here with its room selector.</p>';
       roomEditorHead(room, card);
+      card.appendChild(nightEditor(room));
+      card.appendChild(onDemandEditor(room));
       card.appendChild(scheduleEditor(room));
       wrap.appendChild(card);
       continue;
@@ -437,6 +2236,7 @@ function renderZones(zones) {
 
     const card = document.createElement("div");
     card.className = "zone" + (isOff ? " is-off" : isHeating ? " is-heating" : "");
+    card.id = "room-" + room.id;
     const status = isOff ? "off" : isHeating ? "heating" : "on · idle";
     card.innerHTML = `
       <div class="row" style="justify-content:space-between">
@@ -454,8 +2254,8 @@ function renderZones(zones) {
     const stepper = document.createElement("div");
     stepper.className = "stepper";
     let want = target != null ? Math.round(target * 2) / 2 : (cur != null ? Math.round(cur) : 20);
-    const minus = document.createElement("button"); minus.textContent = "−";
-    const plus = document.createElement("button"); plus.textContent = "+";
+    const minus = document.createElement("button"); minus.textContent = "−"; minus.setAttribute("aria-label", "Lower target");
+    const plus = document.createElement("button"); plus.textContent = "+"; plus.setAttribute("aria-label", "Raise target");
     const tgt = document.createElement("span"); tgt.className = "target";
     const draw = () => tgt.textContent = fmtTemp(want) + "°";
     draw();
@@ -488,9 +2288,10 @@ function renderZones(zones) {
       list.appendChild(row);
     }
     card.appendChild(list);
-    if (room.next && !editing) {
+    if (room.mode && !editing) {
       const nx = document.createElement("div"); nx.className = "row muted"; nx.style.marginTop = "8px";
-      nx.textContent = (room.held ? "manual — held until the next change: " : "schedule · next: ") + room.next;
+      const text = room.next ? MODE_LINE[room.mode] + room.next : room.mode === "away" ? "away mode until you turn it off" : "";
+      nx.textContent = text;
       if (room.held) {
         const rs = document.createElement("button"); rs.className = "ghost"; rs.textContent = "Resume schedule";
         rs.onclick = () => run(api(`api/rooms/${room.id}/resume`, {}), "back to its schedule");
@@ -498,19 +2299,24 @@ function renderZones(zones) {
       }
       card.appendChild(nx);
     }
-    if (editing && room.id != null) { roomEditorHead(room, card); card.appendChild(scheduleEditor(room)); }
+    if (editing && room.id != null) {
+      roomEditorHead(room, card);
+      card.appendChild(nightEditor(room));
+      card.appendChild(onDemandEditor(room));
+      card.appendChild(scheduleEditor(room));
+    }
     wrap.appendChild(card);
   }
 }
 
 // ---- boot ---------------------------------------------------------------------------
 (async () => {
-  try {
-    const s = await api("api/status");
-    renderStatus(s);
-  } catch (e) { toast(e.message, true); }
-  refresh();
+  route();
+  await loadHistory();
+  loadAir();
   refreshTimer = setInterval(refresh, 8000);
+  historyTimer = setInterval(loadHistory, 60000);
+  setInterval(() => { if (onCosts()) loadCosts(); if (onDashboard()) loadAir(); }, 300000);
 })();
 </script>
 </body>

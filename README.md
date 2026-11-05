@@ -60,14 +60,42 @@ Docker Desktop starts (at login).
 
 ## Features
 
-- Dashboard per zone: current temperature, target, humidity, heating activity
-- Rooms grouped and named locally; "Edit rooms & schedules" to rename, add/delete rooms,
-  move devices and edit each room's weekly schedule
-- Set temperature, boost (max temperature), heating off — held until the next schedule change
-- Home/Away presence toggle
+- **Dashboard** (home page, built for phones): house and room figures, temperature, humidity,
+  heating time, a weekday × hour heating map and a room comparison, over 24 h to 1 year
+- **Away mode** — a switch on the dashboard: every room holds one low temperature (or off),
+  until a return date or until switched off
+- **Night off** — heating off in a daily window per room, 22:00–08:00 by default
+- **Settings** (menu): room controls, rename/add/delete rooms, move devices, each room's
+  weekly schedule and night off, system status and pairing
+- Set temperature, boost (max temperature), heating off — held until the next change
+- Home/Away presence toggle for the tado account (cloud; hidden in local-only mode)
 - Per-device **Blink** (HomeKit identify) to find which valve is which; **Check devices**
   asks tado (one cloud call) whether each device is online and its battery state
-- Live HomeKit events plus a 60 s safety poll; data stays in memory
+- Live HomeKit events plus a 60 s safety poll
+
+## What decides a room's temperature
+
+Strongest first: **manual change > away mode > night off > weekly schedule**.
+
+A manual change lasts until the room's next change. During away mode or night off it lasts at
+most an hour, so a forgotten boost can't heat all night. Rooms with no schedule are only touched
+by night off and away mode, and nothing turns them back on afterwards. Unassigned devices follow
+22:00–08:00 and away mode, and a manual change to one at night is reverted.
+
+All of this runs in this app: if the container or the Mac is off, nothing enforces it and the
+schedule stored on the bridge takes over.
+
+## History
+
+`data/history.db` (SQLite, separate from `tado.db`): every device every minute for a year
+(about 200 MB), plus per-room hourly figures kept forever (a few MB a year). Nothing is recorded
+while the bridge is unreachable, so outages show as gaps. HomeKit reports whether a device is
+calling for heat, not how hard, so "heating time" is time spent calling for heat, not energy.
+
+To back it up, stop the container first or use `sqlite3 data/history.db ".backup copy.db"` from
+inside it. Retention is `RAW_DAYS` in `app/history.py`.
+
+Tests: `.venv/bin/python -m unittest tests.test_rules`
 
 ## API (for scripts/automation)
 
@@ -81,6 +109,9 @@ GET    /api/rooms                   (rooms, devices, schedule, next change)
 POST   /api/rooms {"name"} · PATCH /api/rooms/{id} {"name"} · DELETE /api/rooms/{id}
 PUT    /api/devices/{serial}        {"room_id": 3 | null}
 PUT    /api/rooms/{id}/schedule     [{"days": "12345", "time": "06:30", "celsius": 21}, {"days": "1234567", "time": "23:00", "celsius": null}]
+PUT    /api/rooms/{id}/quiet        {"start": "22:00", "end": "08:00"} (both null = no night off)
+POST   /api/house/away              {"active": true, "until": "2026-11-08T18:00" | null, "celsius": 12 | null}
+GET    /api/history?range=24h       (24h, 7d, 30d, 90d, 1y)
 GET    /api/devices/health          (online/battery per device, one cloud call)
 POST   /api/zones/{id}/off
 DELETE /api/zones/{id}/overlay   (resume schedule)
@@ -98,3 +129,35 @@ POST   /api/bridge/rescan
 - The bridge mDNS hostname looks like `tadoBridge<serial>.local`; reserve its
   IP in your router if you want discovery to stay stable.
 - Reverse-engineered/unofficial: tado can change the API at any time.
+
+## Costs and season forecast
+
+The **Costs** tab estimates heating spend for the season (15 October to 15 April, Italian climate zone E).
+Nothing measures gas directly: valve-hours x gas per valve-hour x price. Gas per valve-hour is assumed
+(`kW per valve / (10.7 kWh per Smc x efficiency)`) until two gas meter readings at least a week apart,
+with at least 20 valve-hours between them, replace it. The forecast scales valve-hours per degree day (Eurostat rule) by the
+cold left in the season: a 16-day forecast, then the average of past winters. Weather comes from Open-Meteo;
+only the coordinates leave the house. Set them in `data/config.json` (not in git): `"location": [latitude, longitude]`.
+
+API: `GET /api/costs`, `PUT /api/costs/settings`, `POST /api/costs/meter`, `DELETE /api/costs/meter/{ts}`.
+
+## On-demand rooms and alerts
+
+A room can be **on demand**: it sits on its schedule, and a dashboard switch warms it for a set time
+(`PUT /api/rooms/{id}/on-demand`, `POST /api/rooms/{id}/boost`). Night off still ends it.
+
+A valve that rejects commands or a bridge that disappears shows on the dashboard at once. With **phone
+alerts** on (Settings) a notification goes out after 5 minutes through ntfy.sh, and again when it's fixed.
+Only the room name and the problem are sent, to a random private topic.
+
+## Fresh air and issues
+
+The home screen rates each waking hour for opening windows, from outdoor temperature and humidity, rain and
+European air quality index (`GET /api/air`, from Open-Meteo). Issues appear on the same screen: a valve rejecting
+commands, a room calling for heat for 2 hours without warming, and a suspected open window. A window
+is only inferred from a fast fall in temperature, ignoring the 90 minutes after heating stops.
+
+## House dial
+
+`PUT /api/house/dial` shifts every schedule and on-demand temperature by up to 3 °C either way, in half degrees,
+without changing them. Night off and away mode aren't affected, and a manual temperature stays as set.
